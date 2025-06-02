@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { X, ArrowRight, BrainCircuit } from 'lucide-react';
+import { X, ArrowRight, BrainCircuit, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { supabase } from '../lib/supabase';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -13,15 +14,45 @@ const AuthModal = ({ isOpen, onClose, initialMode }: AuthModalProps) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real app, you would handle authentication here
-    console.log('Form submitted', { mode, email, password, name });
+    setLoading(true);
+    setError(null);
+
+    try {
+      if (mode === 'signup') {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: name,
+            },
+          },
+        });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) throw error;
+      }
+
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const switchMode = () => {
     setMode(mode === 'login' ? 'signup' : 'login');
+    setError(null);
   };
 
   if (!isOpen) return null;
@@ -55,6 +86,12 @@ const AuthModal = ({ isOpen, onClose, initialMode }: AuthModalProps) => {
 
           {/* Body */}
           <div className="px-6 py-6">
+            {error && (
+              <div className="mb-4 p-3 rounded bg-error-50 border border-error-100 text-error-700 text-sm">
+                {error}
+              </div>
+            )}
+            
             <form onSubmit={handleSubmit} className="space-y-4">
               {mode === 'signup' && (
                 <div>
@@ -100,6 +137,7 @@ const AuthModal = ({ isOpen, onClose, initialMode }: AuthModalProps) => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-500"
                   placeholder="••••••••"
                   required
+                  minLength={6}
                 />
               </div>
 
@@ -113,10 +151,17 @@ const AuthModal = ({ isOpen, onClose, initialMode }: AuthModalProps) => {
 
               <button
                 type="submit"
+                disabled={loading}
                 className="w-full btn-primary btn-lg flex justify-center items-center"
               >
-                {mode === 'login' ? 'Log in' : 'Sign up'} 
-                <ArrowRight size={18} className="ml-2" />
+                {loading ? (
+                  <Loader2 size={20} className="animate-spin" />
+                ) : (
+                  <>
+                    {mode === 'login' ? 'Log in' : 'Sign up'}
+                    <ArrowRight size={18} className="ml-2" />
+                  </>
+                )}
               </button>
             </form>
 
