@@ -16,13 +16,13 @@ const Footer = () => {
               AI-powered universal workflow automation platform that connects your favorite work apps.
             </p>
             <div className="flex space-x-4 mt-6">
-              <a href="#" className="text-gray-500 hover:text-accent-600 transition-colors">
+              <a href="https://x.com/SumanthChary07" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-accent-600 transition-colors">
                 <Twitter size={20} />
               </a>
-              <a href="#" className="text-gray-500 hover:text-accent-600 transition-colors">
+              <a href="https://www.github.com/SumanthChary" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-accent-600 transition-colors">
                 <Github size={20} />
               </a>
-              <a href="#" className="text-gray-500 hover:text-accent-600 transition-colors">
+              <a href="https://www.linkedin.com/in/sumanthchary" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-accent-600 transition-colors">
                 <Linkedin size={20} />
               </a>
             </div>
