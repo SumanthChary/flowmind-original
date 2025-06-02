@@ -5,6 +5,7 @@ import { ArrowRight, Zap, Workflow, Sparkles, BrainCircuit, LineChart, Mail, Sla
 import FeatureCard from '../components/FeatureCard';
 import TestimonialCard from '../components/TestimonialCard';
 import IntegrationLogo from '../components/IntegrationLogo';
+import VideoPlayer from '../components/VideoPlayer';
 
 const HomePage = () => {
   useEffect(() => {
@@ -54,7 +55,7 @@ const HomePage = () => {
           {/* Trusted By Section */}
           <div className="mt-16">
             <p className="text-center text-sm font-medium text-gray-500 mb-6">
-              TRUSTED BY TEAMS WORLDWIDE
+              TRUSTED BY INNOVATIVE COMPANIES
             </p>
             <div className="grid grid-cols-2 md:grid-cols-6 gap-8">
               <motion.img 
@@ -62,8 +63,8 @@ const HomePage = () => {
                 animate={{ opacity: 0.7 }}
                 transition={{ duration: 0.5, delay: 0.3 }}
                 whileHover={{ opacity: 1 }}
-                src="https://pbs.twimg.com/profile_images/1682688295257493510/Y9VWUlPF_400x400.jpg" 
-                alt="Company Logo" 
+                src="https://pbs.twimg.com/profile_images/1747713947896905728/nqz0zVVo_400x400.jpg" 
+                alt="Vercel" 
                 className="h-8 mx-auto object-contain grayscale hover:grayscale-0 transition-all"
               />
               <motion.img 
@@ -71,8 +72,8 @@ const HomePage = () => {
                 animate={{ opacity: 0.7 }}
                 transition={{ duration: 0.5, delay: 0.4 }}
                 whileHover={{ opacity: 1 }}
-                src="https://pbs.twimg.com/profile_images/1676995077979607040/ld7MwLmC_400x400.jpg" 
-                alt="Company Logo" 
+                src="https://pbs.twimg.com/profile_images/1751988397024690176/AwhYtaHS_400x400.jpg" 
+                alt="Supabase" 
                 className="h-8 mx-auto object-contain grayscale hover:grayscale-0 transition-all"
               />
               <motion.img 
@@ -80,8 +81,8 @@ const HomePage = () => {
                 animate={{ opacity: 0.7 }}
                 transition={{ duration: 0.5, delay: 0.5 }}
                 whileHover={{ opacity: 1 }}
-                src="https://pbs.twimg.com/profile_images/1741956737773891584/XuQwx55r_400x400.jpg" 
-                alt="Company Logo" 
+                src="https://pbs.twimg.com/profile_images/1753742272341680128/nVGLYWrz_400x400.jpg" 
+                alt="Cloudflare" 
                 className="h-8 mx-auto object-contain grayscale hover:grayscale-0 transition-all"
               />
               <motion.img 
@@ -89,8 +90,8 @@ const HomePage = () => {
                 animate={{ opacity: 0.7 }}
                 transition={{ duration: 0.5, delay: 0.6 }}
                 whileHover={{ opacity: 1 }}
-                src="https://pbs.twimg.com/profile_images/1683325380441128960/yRsRRjGO_400x400.jpg" 
-                alt="Company Logo" 
+                src="https://pbs.twimg.com/profile_images/1753797158255386624/kBFPY-xT_400x400.jpg" 
+                alt="Railway" 
                 className="h-8 mx-auto object-contain grayscale hover:grayscale-0 transition-all"
               />
               <motion.img 
@@ -98,8 +99,8 @@ const HomePage = () => {
                 animate={{ opacity: 0.7 }}
                 transition={{ duration: 0.5, delay: 0.7 }}
                 whileHover={{ opacity: 1 }}
-                src="https://pbs.twimg.com/profile_images/1727080063071084544/7pZLnLQx_400x400.jpg" 
-                alt="Company Logo" 
+                src="https://pbs.twimg.com/profile_images/1752104478083870720/1KNTO_hc_400x400.jpg" 
+                alt="Planetscale" 
                 className="h-8 mx-auto object-contain grayscale hover:grayscale-0 transition-all"
               />
               <motion.img 
@@ -107,9 +108,19 @@ const HomePage = () => {
                 animate={{ opacity: 0.7 }}
                 transition={{ duration: 0.5, delay: 0.8 }}
                 whileHover={{ opacity: 1 }}
-                src="https://pbs.twimg.com/profile_images/1679072590520729600/dZQOx1Jc_400x400.jpg" 
-                alt="Company Logo" 
+                src="https://pbs.twimg.com/profile_images/1753741414915198976/UabMwEKY_400x400.jpg" 
+                alt="Prisma" 
                 className="h-8 mx-auto object-contain grayscale hover:grayscale-0 transition-all"
+              />
+            </div>
+          </div>
+
+          {/* Video Demo Section */}
+          <div className="mt-20" id="demo">
+            <div className="max-w-4xl mx-auto">
+              <VideoPlayer 
+                src="https://example.com/placeholder-video.mp4"
+                poster="https://images.pexels.com/photos/8728560/pexels-photo-8728560.jpeg"
               />
             </div>
           </div>
