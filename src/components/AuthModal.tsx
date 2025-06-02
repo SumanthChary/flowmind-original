@@ -95,7 +95,7 @@ const AuthModal = ({ isOpen, onClose, initialMode }: AuthModalProps) => {
             <form onSubmit={handleSubmit} className="space-y-4">
               {mode === 'signup' && (
                 <div>
-                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="name\" className="block text-sm font-medium text-gray-700 mb-1">
                     Full Name
                   </label>
                   <input
