@@ -1,4 +1,6 @@
 import { Check } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../store/authStore';
 import Button from './Button';
 
 interface PricingFeature {
@@ -28,6 +30,29 @@ const PricingCard = ({
   popular = false,
   billingPeriod,
 }: PricingCardProps) => {
+  const navigate = useNavigate();
+  const { user } = useAuthStore();
+
+  const handleClick = () => {
+    if (!user) {
+      // Trigger auth modal through Layout component
+      const event = new CustomEvent('openAuthModal', { detail: { mode: 'signup' } });
+      window.dispatchEvent(event);
+      return;
+    }
+
+    navigate('/payment', { 
+      state: { 
+        plan: {
+          title,
+          description,
+          price,
+          features
+        }
+      }
+    });
+  };
+
   return (
     <div className={`
       rounded-xl p-8 h-full flex flex-col
@@ -80,6 +105,7 @@ const PricingCard = ({
         variant={popular ? 'primary' : 'outline'}
         fullWidth
         size="lg"
+        onClick={handleClick}
       >
         {ctaText}
       </Button>

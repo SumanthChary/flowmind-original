@@ -14,8 +14,18 @@ const Layout = () => {
       setIsScrolled(window.scrollY > 10);
     };
 
+    const handleAuthModal = (e: CustomEvent) => {
+      setAuthMode(e.detail.mode);
+      setShowAuthModal(true);
+    };
+
     window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener('openAuthModal', handleAuthModal as EventListener);
+    
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('openAuthModal', handleAuthModal as EventListener);
+    };
   }, []);
 
   const openLoginModal = () => {

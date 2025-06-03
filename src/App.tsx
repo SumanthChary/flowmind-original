@@ -5,6 +5,7 @@ import AuthGuard from './components/AuthGuard';
 import HomePage from './pages/HomePage';
 import FeaturesPage from './pages/FeaturesPage';
 import PricingPage from './pages/PricingPage';
+import PaymentPage from './pages/PaymentPage';
 import AboutPage from './pages/AboutPage';
 import DashboardPage from './pages/DashboardPage';
 import ProfilePage from './pages/ProfilePage';
@@ -18,6 +19,11 @@ function App() {
           <Route index element={<HomePage />} />
           <Route path="features" element={<FeaturesPage />} />
           <Route path="pricing" element={<PricingPage />} />
+          <Route path="payment" element={
+            <AuthGuard>
+              <PaymentPage />
+            </AuthGuard>
+          } />
           <Route path="about" element={<AboutPage />} />
           <Route path="dashboard" element={
             <AuthGuard>
