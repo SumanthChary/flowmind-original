@@ -1,32 +1,31 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Mail, Key, LogOut } from 'lucide-react';
-import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import toast from 'react-hot-toast';
 
 const ProfilePage = () => {
-  const { user } = useAuthStore();
+  const { user, profile, updateProfile } = useAuthStore();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [fullName, setFullName] = useState(user?.user_metadata?.full_name || '');
-  const [email, setEmail] = useState(user?.email || '');
+  const [fullName, setFullName] = useState(profile?.full_name || '');
 
   useEffect(() => {
     document.title = "Profile | FlowMind";
   }, []);
+
+  useEffect(() => {
+    if (profile) {
+      setFullName(profile.full_name || '');
+    }
+  }, [profile]);
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.updateUser({
-        email,
-        data: { full_name: fullName }
-      });
-
-      if (error) throw error;
+      await updateProfile({ full_name: fullName });
       toast.success('Profile updated successfully');
     } catch (error) {
       toast.error('Error updating profile');
@@ -45,8 +44,10 @@ const ProfilePage = () => {
     }
   };
 
+  if (!user || !profile) return null;
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pt-20">
       <div className="container py-8">
         <div className="max-w-2xl mx-auto">
           <div className="bg-white rounded-xl shadow-soft p-8">
@@ -105,29 +106,13 @@ const ProfilePage = () => {
                   <input
                     type="email"
                     id="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                    placeholder="you@example.com"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                  Password
-                </label>
-                <div className="relative">
-                  <Key size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="password"
-                    id="password"
-                    className="pl-10 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                    placeholder="••••••••"
+                    value={user.email}
+                    disabled
+                    className="pl-10 w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
                   />
                 </div>
                 <p className="mt-2 text-sm text-gray-500">
-                  Leave blank to keep your current password
+                  Email cannot be changed
                 </p>
               </div>
 
