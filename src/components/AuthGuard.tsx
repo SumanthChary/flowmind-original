@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import { Loader2 } from 'lucide-react';
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -12,6 +13,9 @@ const AuthGuard = ({ children }: AuthGuardProps) => {
 
   useEffect(() => {
     if (!loading && !user) {
+      // Trigger auth modal
+      const event = new CustomEvent('openAuthModal', { detail: { mode: 'login' } });
+      window.dispatchEvent(event);
       navigate('/');
     }
   }, [user, loading, navigate]);
@@ -19,7 +23,10 @@ const AuthGuard = ({ children }: AuthGuardProps) => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-accent-600"></div>
+        <div className="flex flex-col items-center">
+          <Loader2 size={40} className="animate-spin text-accent-600 mb-4" />
+          <p className="text-gray-600">Loading...</p>
+        </div>
       </div>
     );
   }
