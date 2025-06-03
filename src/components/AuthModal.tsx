@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X, ArrowRight, BrainCircuit, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
+import toast from 'react-hot-toast';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -34,17 +35,20 @@ const AuthModal = ({ isOpen, onClose, initialMode }: AuthModalProps) => {
           },
         });
         if (error) throw error;
+        toast.success('Account created successfully! Please check your email to verify your account.');
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (error) throw error;
+        toast.success('Welcome back!');
       }
 
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
+      toast.error(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
     }
@@ -106,6 +110,7 @@ const AuthModal = ({ isOpen, onClose, initialMode }: AuthModalProps) => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-500"
                     placeholder="John Doe"
                     required
+                    disabled={loading}
                   />
                 </div>
               )}
@@ -122,6 +127,7 @@ const AuthModal = ({ isOpen, onClose, initialMode }: AuthModalProps) => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-500"
                   placeholder="you@example.com"
                   required
+                  disabled={loading}
                 />
               </div>
               
@@ -138,16 +144,9 @@ const AuthModal = ({ isOpen, onClose, initialMode }: AuthModalProps) => {
                   placeholder="••••••••"
                   required
                   minLength={6}
+                  disabled={loading}
                 />
               </div>
-
-              {mode === 'login' && (
-                <div className="flex justify-end">
-                  <a href="#" className="text-sm text-accent-600 hover:text-accent-800">
-                    Forgot password?
-                  </a>
-                </div>
-              )}
 
               <button
                 type="submit"
@@ -170,6 +169,7 @@ const AuthModal = ({ isOpen, onClose, initialMode }: AuthModalProps) => {
                 {mode === 'login' ? "Don't have an account?" : "Already have an account?"}
                 <button
                   onClick={switchMode}
+                  disabled={loading}
                   className="ml-1 text-accent-600 hover:text-accent-800 font-medium"
                 >
                   {mode === 'login' ? 'Sign up' : 'Log in'}
