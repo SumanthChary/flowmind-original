@@ -61,11 +61,17 @@ const AuthGuard = ({ children }: AuthGuardProps) => {
     }
   }, [user, loading, initialized, navigate]);
 
-  if (!initialized || loading) {
+  // Show loading only if not initialized
+  if (!initialized) {
     return <LoadingSkeleton />;
   }
 
-  return user ? <>{children}</> : null;
+  // If no user, return null (will redirect)
+  if (!user) {
+    return null;
+  }
+
+  return <>{children}</>;
 };
 
 export default AuthGuard;

@@ -14,9 +14,11 @@ interface AuthState {
   profile: Profile | null;
   loading: boolean;
   initialized: boolean;
+  profileLoading: boolean;
   setUser: (user: User | null) => void;
   setProfile: (profile: Profile | null) => void;
   setLoading: (loading: boolean) => void;
+  setProfileLoading: (loading: boolean) => void;
   setInitialized: (initialized: boolean) => void;
   fetchProfile: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
@@ -28,15 +30,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   profile: null,
   loading: true,
   initialized: false,
+  profileLoading: false,
   setUser: (user) => set({ user }),
   setProfile: (profile) => set({ profile }),
   setLoading: (loading) => set({ loading }),
+  setProfileLoading: (profileLoading) => set({ profileLoading }),
   setInitialized: (initialized) => set({ initialized }),
+  
   fetchProfile: async () => {
+    const { user, profile } = get();
+    if (!user || profile) return; // Don't fetch if already have profile
+    
+    set({ profileLoading: true });
+    
     try {
-      const { user } = get();
-      if (!user) return;
-
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -72,27 +79,36 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
     } catch (error) {
       console.error('Error in fetchProfile:', error);
+    } finally {
+      set({ profileLoading: false });
     }
   },
+  
   updateProfile: async (updates) => {
-    try {
-      const { user, profile } = get();
-      if (!user || !profile) return;
+    const { user, profile } = get();
+    if (!user || !profile) return;
 
+    // Optimistic update
+    const updatedProfile = { ...profile, ...updates, updated_at: new Date().toISOString() };
+    set({ profile: updatedProfile });
+
+    try {
       const { error } = await supabase
         .from('profiles')
         .update({ ...updates, updated_at: new Date().toISOString() })
         .eq('id', user.id);
 
-      if (error) throw error;
-      
-      // Update local state
-      set({ profile: { ...profile, ...updates } });
+      if (error) {
+        // Revert on error
+        set({ profile });
+        throw error;
+      }
     } catch (error) {
       console.error('Error updating profile:', error);
       throw error;
     }
   },
+  
   signOut: async () => {
     try {
       const { error } = await supabase.auth.signOut();
@@ -105,31 +121,30 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 }));
 
-// Initialize auth state
+// Initialize auth state with faster loading
 const initializeAuth = async () => {
   const store = useAuthStore.getState();
   
   try {
-    const { data: { session }, error } = await supabase.auth.getSession();
-    
-    if (error) {
-      console.error('Error getting session:', error);
-    }
+    // Get session immediately without waiting
+    const { data: { session } } = await supabase.auth.getSession();
     
     store.setUser(session?.user ?? null);
+    store.setInitialized(true);
+    store.setLoading(false);
     
+    // Fetch profile in background if user exists
     if (session?.user) {
-      await store.fetchProfile();
+      store.fetchProfile();
     }
   } catch (error) {
     console.error('Error initializing auth:', error);
-  } finally {
     store.setLoading(false);
     store.setInitialized(true);
   }
 };
 
-// Initialize on load
+// Initialize immediately
 initializeAuth();
 
 // Listen for auth changes
@@ -138,7 +153,7 @@ supabase.auth.onAuthStateChange(async (event, session) => {
   
   if (event === 'SIGNED_IN' && session?.user) {
     store.setUser(session.user);
-    await store.fetchProfile();
+    store.fetchProfile();
   } else if (event === 'SIGNED_OUT') {
     store.setUser(null);
     store.setProfile(null);

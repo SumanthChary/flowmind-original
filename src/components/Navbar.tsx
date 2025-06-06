@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { NavLink, Link } from 'react-router-dom';
-import { Menu, X, BrainCircuit, User } from 'lucide-react';
+import { Menu, X, BrainCircuit } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import clsx from 'clsx';
 
@@ -22,20 +22,15 @@ const Navbar = ({ isScrolled, onLoginClick, onSignupClick }: NavbarProps) => {
     setIsMenuOpen(false);
   };
 
-  const getDisplayName = () => {
-    if (profile?.full_name) {
-      return profile.full_name;
-    }
-    if (user?.email) {
-      return user.email.split('@')[0];
-    }
-    return 'User';
-  };
-
-  const getInitials = () => {
-    const name = getDisplayName();
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-  };
+  // Memoize user display data for better performance
+  const userDisplayData = useMemo(() => {
+    if (!user) return null;
+    
+    const displayName = profile?.full_name || user.email?.split('@')[0] || 'User';
+    const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    
+    return { displayName, initials };
+  }, [user, profile]);
 
   return (
     <header
@@ -89,7 +84,7 @@ const Navbar = ({ isScrolled, onLoginClick, onSignupClick }: NavbarProps) => {
 
         {/* Desktop Auth Buttons */}
         <div className="hidden md:flex items-center space-x-4">
-          {user ? (
+          {user && userDisplayData ? (
             <div className="flex items-center space-x-4">
               <Link 
                 to="/dashboard" 
@@ -104,17 +99,17 @@ const Navbar = ({ isScrolled, onLoginClick, onSignupClick }: NavbarProps) => {
                 {profile?.avatar_url ? (
                   <img 
                     src={profile.avatar_url} 
-                    alt={getDisplayName()} 
+                    alt={userDisplayData.displayName} 
                     className="w-8 h-8 rounded-full object-cover"
                   />
                 ) : (
                   <div className="w-8 h-8 bg-accent-100 rounded-full flex items-center justify-center">
                     <span className="text-xs font-medium text-accent-600">
-                      {getInitials()}
+                      {userDisplayData.initials}
                     </span>
                   </div>
                 )}
-                <span className="font-medium">{getDisplayName()}</span>
+                <span className="font-medium">{userDisplayData.displayName}</span>
               </Link>
             </div>
           ) : (
@@ -191,7 +186,7 @@ const Navbar = ({ isScrolled, onLoginClick, onSignupClick }: NavbarProps) => {
             >
               About
             </NavLink>
-            {user ? (
+            {user && userDisplayData ? (
               <>
                 <Link 
                   to="/dashboard" 
@@ -208,17 +203,17 @@ const Navbar = ({ isScrolled, onLoginClick, onSignupClick }: NavbarProps) => {
                   {profile?.avatar_url ? (
                     <img 
                       src={profile.avatar_url} 
-                      alt={getDisplayName()} 
+                      alt={userDisplayData.displayName} 
                       className="w-6 h-6 rounded-full object-cover"
                     />
                   ) : (
                     <div className="w-6 h-6 bg-accent-100 rounded-full flex items-center justify-center">
                       <span className="text-xs font-medium text-accent-600">
-                        {getInitials()}
+                        {userDisplayData.initials}
                       </span>
                     </div>
                   )}
-                  <span>{getDisplayName()}</span>
+                  <span>{userDisplayData.displayName}</span>
                 </Link>
               </>
             ) : (
