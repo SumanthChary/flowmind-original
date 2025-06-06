@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, ArrowRight, BrainCircuit, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
@@ -18,6 +18,19 @@ const AuthModal = ({ isOpen, onClose, initialMode }: AuthModalProps) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    setMode(initialMode);
+  }, [initialMode]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setEmail('');
+      setPassword('');
+      setName('');
+      setError(null);
+    }
+  }, [isOpen]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -35,7 +48,8 @@ const AuthModal = ({ isOpen, onClose, initialMode }: AuthModalProps) => {
           },
         });
         if (error) throw error;
-        toast.success('Account created successfully! Please check your email to verify your account.');
+        toast.success('Account created successfully! You are now logged in.');
+        onClose();
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
@@ -43,12 +57,12 @@ const AuthModal = ({ isOpen, onClose, initialMode }: AuthModalProps) => {
         });
         if (error) throw error;
         toast.success('Welcome back!');
+        onClose();
       }
-
-      onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-      toast.error(err instanceof Error ? err.message : 'An error occurred');
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -57,19 +71,22 @@ const AuthModal = ({ isOpen, onClose, initialMode }: AuthModalProps) => {
   const switchMode = () => {
     setMode(mode === 'login' ? 'signup' : 'login');
     setError(null);
+    setEmail('');
+    setPassword('');
+    setName('');
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50 backdrop-blur-sm">
       <AnimatePresence>
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.95 }}
+          initial={{ opacity: 0, scale: 0.95, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 20 }}
           transition={{ duration: 0.2 }}
-          className="bg-white rounded-lg shadow-medium max-w-md w-full mx-auto overflow-hidden"
+          className="bg-white rounded-xl shadow-medium max-w-md w-full mx-auto overflow-hidden"
         >
           {/* Header */}
           <div className="relative px-6 py-4 border-b border-gray-100">
@@ -91,15 +108,24 @@ const AuthModal = ({ isOpen, onClose, initialMode }: AuthModalProps) => {
           {/* Body */}
           <div className="px-6 py-6">
             {error && (
-              <div className="mb-4 p-3 rounded bg-error-50 border border-error-100 text-error-700 text-sm">
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-4 p-3 rounded-lg bg-error-50 border border-error-100 text-error-700 text-sm"
+              >
                 {error}
-              </div>
+              </motion.div>
             )}
             
             <form onSubmit={handleSubmit} className="space-y-4">
               {mode === 'signup' && (
-                <div>
-                  <label htmlFor="name\" className="block text-sm font-medium text-gray-700 mb-1">
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
                     Full Name
                   </label>
                   <input
@@ -107,12 +133,12 @@ const AuthModal = ({ isOpen, onClose, initialMode }: AuthModalProps) => {
                     id="name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors"
                     placeholder="John Doe"
                     required
                     disabled={loading}
                   />
-                </div>
+                </motion.div>
               )}
               
               <div>
@@ -124,7 +150,7 @@ const AuthModal = ({ isOpen, onClose, initialMode }: AuthModalProps) => {
                   id="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors"
                   placeholder="you@example.com"
                   required
                   disabled={loading}
@@ -140,7 +166,7 @@ const AuthModal = ({ isOpen, onClose, initialMode }: AuthModalProps) => {
                   id="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors"
                   placeholder="••••••••"
                   required
                   minLength={6}
@@ -151,7 +177,7 @@ const AuthModal = ({ isOpen, onClose, initialMode }: AuthModalProps) => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full btn-primary btn-lg flex justify-center items-center"
+                className="w-full btn-primary btn-lg flex justify-center items-center disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <Loader2 size={20} className="animate-spin" />
@@ -170,7 +196,7 @@ const AuthModal = ({ isOpen, onClose, initialMode }: AuthModalProps) => {
                 <button
                   onClick={switchMode}
                   disabled={loading}
-                  className="ml-1 text-accent-600 hover:text-accent-800 font-medium"
+                  className="ml-1 text-accent-600 hover:text-accent-800 font-medium transition-colors disabled:opacity-50"
                 >
                   {mode === 'login' ? 'Sign up' : 'Log in'}
                 </button>
@@ -180,11 +206,11 @@ const AuthModal = ({ isOpen, onClose, initialMode }: AuthModalProps) => {
             {mode === 'signup' && (
               <p className="mt-4 text-xs text-gray-500 text-center">
                 By signing up, you agree to our{' '}
-                <a href="#" className="text-accent-600 hover:text-accent-800">
+                <a href="#" className="text-accent-600 hover:text-accent-800 transition-colors">
                   Terms of Service
                 </a>{' '}
                 and{' '}
-                <a href="#" className="text-accent-600 hover:text-accent-800">
+                <a href="#" className="text-accent-600 hover:text-accent-800 transition-colors">
                   Privacy Policy
                 </a>
                 .

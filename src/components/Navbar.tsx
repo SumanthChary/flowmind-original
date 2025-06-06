@@ -12,7 +12,7 @@ interface NavbarProps {
 
 const Navbar = ({ isScrolled, onLoginClick, onSignupClick }: NavbarProps) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { user, profile } = useAuthStore();
+  const { user, profile, loading } = useAuthStore();
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
@@ -20,6 +20,21 @@ const Navbar = ({ isScrolled, onLoginClick, onSignupClick }: NavbarProps) => {
 
   const closeMenu = () => {
     setIsMenuOpen(false);
+  };
+
+  const getDisplayName = () => {
+    if (profile?.full_name) {
+      return profile.full_name;
+    }
+    if (user?.email) {
+      return user.email.split('@')[0];
+    }
+    return 'User';
+  };
+
+  const getInitials = () => {
+    const name = getDisplayName();
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
   return (
@@ -78,7 +93,7 @@ const Navbar = ({ isScrolled, onLoginClick, onSignupClick }: NavbarProps) => {
             <div className="flex items-center space-x-4">
               <Link 
                 to="/dashboard" 
-                className="text-gray-700 hover:text-accent-600 transition-colors"
+                className="text-gray-700 hover:text-accent-600 transition-colors font-medium"
               >
                 Dashboard
               </Link>
@@ -89,31 +104,42 @@ const Navbar = ({ isScrolled, onLoginClick, onSignupClick }: NavbarProps) => {
                 {profile?.avatar_url ? (
                   <img 
                     src={profile.avatar_url} 
-                    alt={profile.full_name || 'Profile'} 
-                    className="w-8 h-8 rounded-full"
+                    alt={getDisplayName()} 
+                    className="w-8 h-8 rounded-full object-cover"
                   />
                 ) : (
                   <div className="w-8 h-8 bg-accent-100 rounded-full flex items-center justify-center">
-                    <User size={20} className="text-accent-600" />
+                    <span className="text-xs font-medium text-accent-600">
+                      {getInitials()}
+                    </span>
                   </div>
                 )}
-                <span>{profile?.full_name || 'Profile'}</span>
+                <span className="font-medium">{getDisplayName()}</span>
               </Link>
             </div>
           ) : (
             <>
-              <button 
-                onClick={onLoginClick}
-                className="text-gray-700 hover:text-accent-600 font-medium transition-colors"
-              >
-                Log in
-              </button>
-              <button 
-                onClick={onSignupClick}
-                className="btn-primary"
-              >
-                Get Started Free
-              </button>
+              {loading ? (
+                <div className="flex items-center space-x-4">
+                  <div className="h-4 w-16 bg-gray-200 rounded animate-pulse"></div>
+                  <div className="h-9 w-24 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+              ) : (
+                <>
+                  <button 
+                    onClick={onLoginClick}
+                    className="text-gray-700 hover:text-accent-600 font-medium transition-colors"
+                  >
+                    Log in
+                  </button>
+                  <button 
+                    onClick={onSignupClick}
+                    className="btn-primary"
+                  >
+                    Get Started Free
+                  </button>
+                </>
+              )}
             </>
           )}
         </div>
@@ -169,17 +195,30 @@ const Navbar = ({ isScrolled, onLoginClick, onSignupClick }: NavbarProps) => {
               <>
                 <Link 
                   to="/dashboard" 
-                  className="text-gray-700 hover:text-accent-600 transition-colors"
+                  className="text-gray-700 hover:text-accent-600 transition-colors font-medium"
                   onClick={closeMenu}
                 >
                   Dashboard
                 </Link>
                 <Link 
                   to="/profile" 
-                  className="text-gray-700 hover:text-accent-600 transition-colors"
+                  className="flex items-center space-x-2 text-gray-700 hover:text-accent-600 transition-colors"
                   onClick={closeMenu}
                 >
-                  Profile
+                  {profile?.avatar_url ? (
+                    <img 
+                      src={profile.avatar_url} 
+                      alt={getDisplayName()} 
+                      className="w-6 h-6 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-6 h-6 bg-accent-100 rounded-full flex items-center justify-center">
+                      <span className="text-xs font-medium text-accent-600">
+                        {getInitials()}
+                      </span>
+                    </div>
+                  )}
+                  <span>{getDisplayName()}</span>
                 </Link>
               </>
             ) : (
