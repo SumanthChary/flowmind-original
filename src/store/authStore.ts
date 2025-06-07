@@ -14,11 +14,9 @@ interface AuthState {
   profile: Profile | null;
   loading: boolean;
   initialized: boolean;
-  profileLoading: boolean;
   setUser: (user: User | null) => void;
   setProfile: (profile: Profile | null) => void;
   setLoading: (loading: boolean) => void;
-  setProfileLoading: (loading: boolean) => void;
   setInitialized: (initialized: boolean) => void;
   fetchProfile: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
@@ -28,20 +26,16 @@ interface AuthState {
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   profile: null,
-  loading: true,
+  loading: false,
   initialized: false,
-  profileLoading: false,
   setUser: (user) => set({ user }),
   setProfile: (profile) => set({ profile }),
   setLoading: (loading) => set({ loading }),
-  setProfileLoading: (profileLoading) => set({ profileLoading }),
   setInitialized: (initialized) => set({ initialized }),
   
   fetchProfile: async () => {
-    const { user, profile } = get();
-    if (!user || profile) return; // Don't fetch if already have profile
-    
-    set({ profileLoading: true });
+    const { user } = get();
+    if (!user) return;
     
     try {
       const { data, error } = await supabase
@@ -79,8 +73,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
     } catch (error) {
       console.error('Error in fetchProfile:', error);
-    } finally {
-      set({ profileLoading: false });
     }
   },
   
@@ -121,26 +113,25 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 }));
 
-// Initialize auth state with faster loading
+// Initialize auth state
 const initializeAuth = async () => {
   const store = useAuthStore.getState();
   
   try {
-    // Get session immediately without waiting
+    store.setLoading(true);
     const { data: { session } } = await supabase.auth.getSession();
     
     store.setUser(session?.user ?? null);
     store.setInitialized(true);
-    store.setLoading(false);
     
-    // Fetch profile in background if user exists
+    // Fetch profile if user exists
     if (session?.user) {
-      store.fetchProfile();
+      await store.fetchProfile();
     }
   } catch (error) {
     console.error('Error initializing auth:', error);
+  } finally {
     store.setLoading(false);
-    store.setInitialized(true);
   }
 };
 
@@ -153,7 +144,7 @@ supabase.auth.onAuthStateChange(async (event, session) => {
   
   if (event === 'SIGNED_IN' && session?.user) {
     store.setUser(session.user);
-    store.fetchProfile();
+    await store.fetchProfile();
   } else if (event === 'SIGNED_OUT') {
     store.setUser(null);
     store.setProfile(null);

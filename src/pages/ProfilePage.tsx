@@ -1,55 +1,12 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Mail, LogOut, Camera, Save, Calendar, Shield, Activity } from 'lucide-react';
+import { User, Mail, LogOut, Camera, Save, Calendar, Shield, Activity, ArrowLeft } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 
-const ProfileSkeleton = () => (
-  <div className="min-h-screen bg-gray-50 pt-20">
-    <div className="container py-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Profile Card Skeleton */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl shadow-soft p-6 animate-pulse">
-              <div className="text-center">
-                <div className="w-24 h-24 bg-gray-200 rounded-full mx-auto mb-4"></div>
-                <div className="h-6 bg-gray-200 rounded w-3/4 mx-auto mb-2"></div>
-                <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto mb-4"></div>
-                <div className="h-10 bg-gray-200 rounded w-full"></div>
-              </div>
-            </div>
-          </div>
-          
-          {/* Main Content Skeleton */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white rounded-xl shadow-soft p-6 animate-pulse">
-              <div className="h-6 bg-gray-200 rounded w-1/3 mb-6"></div>
-              <div className="space-y-4">
-                <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-                <div className="h-10 bg-gray-200 rounded w-full"></div>
-                <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-                <div className="h-10 bg-gray-200 rounded w-full"></div>
-              </div>
-            </div>
-            
-            <div className="bg-white rounded-xl shadow-soft p-6 animate-pulse">
-              <div className="h-6 bg-gray-200 rounded w-1/3 mb-6"></div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="h-16 bg-gray-200 rounded"></div>
-                <div className="h-16 bg-gray-200 rounded"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-);
-
 const ProfilePage = () => {
-  const { user, profile, updateProfile, signOut, loading, profileLoading } = useAuthStore();
+  const { user, profile, updateProfile, signOut } = useAuthStore();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [fullName, setFullName] = useState('');
@@ -64,25 +21,13 @@ const ProfilePage = () => {
     }
   }, [profile]);
 
-  // Memoize user display data
-  const userDisplayData = useMemo(() => {
-    if (!user) return null;
-    
-    const displayName = profile?.full_name || user.email?.split('@')[0] || 'User';
-    const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-    const joinDate = user.created_at ? new Date(user.created_at).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    }) : 'Unknown';
-    const lastUpdated = profile?.updated_at ? new Date(profile.updated_at).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    }) : 'Never';
-    
-    return { displayName, initials, joinDate, lastUpdated };
-  }, [user, profile]);
+  const displayName = profile?.full_name || user?.email?.split('@')[0] || 'User';
+  const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  const joinDate = user?.created_at ? new Date(user.created_at).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  }) : 'Unknown';
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,13 +60,20 @@ const ProfilePage = () => {
     }
   };
 
-  if (loading || !user || !userDisplayData) {
-    return <ProfileSkeleton />;
-  }
-
   return (
     <div className="min-h-screen bg-gray-50 pt-20">
       <div className="container py-8">
+        {/* Back Button */}
+        <motion.button
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          onClick={() => navigate('/dashboard')}
+          className="flex items-center text-gray-600 hover:text-accent-600 mb-8 transition-colors"
+        >
+          <ArrowLeft size={20} className="mr-2" />
+          Back to Dashboard
+        </motion.button>
+
         <div className="max-w-4xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -137,13 +89,13 @@ const ProfilePage = () => {
                     {profile?.avatar_url ? (
                       <img 
                         src={profile.avatar_url} 
-                        alt={userDisplayData.displayName} 
+                        alt={displayName} 
                         className="w-24 h-24 rounded-full object-cover mx-auto"
                       />
                     ) : (
                       <div className="w-24 h-24 bg-gradient-to-br from-accent-400 to-accent-600 rounded-full flex items-center justify-center mx-auto">
                         <span className="text-2xl font-bold text-white">
-                          {userDisplayData.initials}
+                          {initials}
                         </span>
                       </div>
                     )}
@@ -153,9 +105,9 @@ const ProfilePage = () => {
                   </div>
                   
                   <h2 className="text-xl font-bold text-gray-900 mb-1">
-                    {userDisplayData.displayName}
+                    {displayName}
                   </h2>
-                  <p className="text-gray-600 mb-4">{user.email}</p>
+                  <p className="text-gray-600 mb-4">{user?.email}</p>
                   
                   <button
                     onClick={handleSignOut}
@@ -216,7 +168,6 @@ const ProfilePage = () => {
                         onChange={(e) => setFullName(e.target.value)}
                         className="pl-10 w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-all"
                         placeholder="Enter your full name"
-                        disabled={profileLoading}
                       />
                     </div>
                   </div>
@@ -230,7 +181,7 @@ const ProfilePage = () => {
                       <input
                         type="email"
                         id="email"
-                        value={user.email || ''}
+                        value={user?.email || ''}
                         disabled
                         className="pl-10 w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
                       />
@@ -243,8 +194,8 @@ const ProfilePage = () => {
                   <div className="flex justify-end">
                     <button
                       type="submit"
-                      disabled={isLoading || profileLoading}
-                      className="flex items-center btn-primary px-6 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={isLoading}
+                      className="flex items-center bg-accent-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-accent-700 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:ring-offset-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isLoading ? (
                         <>
@@ -271,15 +222,15 @@ const ProfilePage = () => {
                       <Calendar size={16} className="text-primary-600 mr-2" />
                       <span className="text-sm font-medium text-gray-900">Member Since</span>
                     </div>
-                    <p className="text-lg font-semibold text-gray-900">{userDisplayData.joinDate}</p>
+                    <p className="text-lg font-semibold text-gray-900">{joinDate}</p>
                   </div>
                   
                   <div className="bg-gray-50 rounded-lg p-4">
                     <div className="flex items-center mb-2">
                       <Activity size={16} className="text-accent-600 mr-2" />
-                      <span className="text-sm font-medium text-gray-900">Last Updated</span>
+                      <span className="text-sm font-medium text-gray-900">Account Status</span>
                     </div>
-                    <p className="text-lg font-semibold text-gray-900">{userDisplayData.lastUpdated}</p>
+                    <p className="text-lg font-semibold text-success-600">Active</p>
                   </div>
                 </div>
               </div>
@@ -293,7 +244,7 @@ const ProfilePage = () => {
                       <h4 className="font-medium text-gray-900">Two-Factor Authentication</h4>
                       <p className="text-sm text-gray-600">Add an extra layer of security to your account</p>
                     </div>
-                    <button className="btn-secondary text-sm">
+                    <button className="bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">
                       Enable
                     </button>
                   </div>
@@ -303,7 +254,7 @@ const ProfilePage = () => {
                       <h4 className="font-medium text-gray-900">Login Notifications</h4>
                       <p className="text-sm text-gray-600">Get notified when someone logs into your account</p>
                     </div>
-                    <button className="btn-secondary text-sm">
+                    <button className="bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">
                       Configure
                     </button>
                   </div>

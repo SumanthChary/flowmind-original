@@ -1,18 +1,17 @@
-import { useState, useMemo } from 'react';
-import { NavLink, Link } from 'react-router-dom';
+import { useState } from 'react';
+import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { Menu, X, BrainCircuit } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import clsx from 'clsx';
 
 interface NavbarProps {
   isScrolled: boolean;
-  onLoginClick: () => void;
-  onSignupClick: () => void;
 }
 
-const Navbar = ({ isScrolled, onLoginClick, onSignupClick }: NavbarProps) => {
+const Navbar = ({ isScrolled }: NavbarProps) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { user, profile, loading } = useAuthStore();
+  const { user, profile } = useAuthStore();
+  const navigate = useNavigate();
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
@@ -22,15 +21,13 @@ const Navbar = ({ isScrolled, onLoginClick, onSignupClick }: NavbarProps) => {
     setIsMenuOpen(false);
   };
 
-  // Memoize user display data for better performance
-  const userDisplayData = useMemo(() => {
-    if (!user) return null;
-    
-    const displayName = profile?.full_name || user.email?.split('@')[0] || 'User';
-    const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-    
-    return { displayName, initials };
-  }, [user, profile]);
+  const handleAuthClick = (mode: 'login' | 'signup') => {
+    navigate(`/auth?mode=${mode}`);
+    closeMenu();
+  };
+
+  const displayName = profile?.full_name || user?.email?.split('@')[0] || 'User';
+  const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 
   return (
     <header
@@ -84,7 +81,7 @@ const Navbar = ({ isScrolled, onLoginClick, onSignupClick }: NavbarProps) => {
 
         {/* Desktop Auth Buttons */}
         <div className="hidden md:flex items-center space-x-4">
-          {user && userDisplayData ? (
+          {user ? (
             <div className="flex items-center space-x-4">
               <Link 
                 to="/dashboard" 
@@ -99,42 +96,33 @@ const Navbar = ({ isScrolled, onLoginClick, onSignupClick }: NavbarProps) => {
                 {profile?.avatar_url ? (
                   <img 
                     src={profile.avatar_url} 
-                    alt={userDisplayData.displayName} 
+                    alt={displayName} 
                     className="w-8 h-8 rounded-full object-cover"
                   />
                 ) : (
                   <div className="w-8 h-8 bg-accent-100 rounded-full flex items-center justify-center">
                     <span className="text-xs font-medium text-accent-600">
-                      {userDisplayData.initials}
+                      {initials}
                     </span>
                   </div>
                 )}
-                <span className="font-medium">{userDisplayData.displayName}</span>
+                <span className="font-medium">{displayName}</span>
               </Link>
             </div>
           ) : (
             <>
-              {loading ? (
-                <div className="flex items-center space-x-4">
-                  <div className="h-4 w-16 bg-gray-200 rounded animate-pulse"></div>
-                  <div className="h-9 w-24 bg-gray-200 rounded animate-pulse"></div>
-                </div>
-              ) : (
-                <>
-                  <button 
-                    onClick={onLoginClick}
-                    className="text-gray-700 hover:text-accent-600 font-medium transition-colors"
-                  >
-                    Log in
-                  </button>
-                  <button 
-                    onClick={onSignupClick}
-                    className="btn-primary"
-                  >
-                    Get Started Free
-                  </button>
-                </>
-              )}
+              <button 
+                onClick={() => handleAuthClick('login')}
+                className="text-gray-700 hover:text-accent-600 font-medium transition-colors"
+              >
+                Sign In
+              </button>
+              <button 
+                onClick={() => handleAuthClick('signup')}
+                className="bg-accent-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-accent-700 transition-colors"
+              >
+                Get Started Free
+              </button>
             </>
           )}
         </div>
@@ -186,7 +174,7 @@ const Navbar = ({ isScrolled, onLoginClick, onSignupClick }: NavbarProps) => {
             >
               About
             </NavLink>
-            {user && userDisplayData ? (
+            {user ? (
               <>
                 <Link 
                   to="/dashboard" 
@@ -203,36 +191,30 @@ const Navbar = ({ isScrolled, onLoginClick, onSignupClick }: NavbarProps) => {
                   {profile?.avatar_url ? (
                     <img 
                       src={profile.avatar_url} 
-                      alt={userDisplayData.displayName} 
+                      alt={displayName} 
                       className="w-6 h-6 rounded-full object-cover"
                     />
                   ) : (
                     <div className="w-6 h-6 bg-accent-100 rounded-full flex items-center justify-center">
                       <span className="text-xs font-medium text-accent-600">
-                        {userDisplayData.initials}
+                        {initials}
                       </span>
                     </div>
                   )}
-                  <span>{userDisplayData.displayName}</span>
+                  <span>{displayName}</span>
                 </Link>
               </>
             ) : (
               <div className="pt-4 flex flex-col space-y-3">
                 <button 
-                  onClick={() => {
-                    onLoginClick();
-                    closeMenu();
-                  }}
+                  onClick={() => handleAuthClick('login')}
                   className="text-center py-2 text-gray-700 hover:text-accent-600 font-medium transition-colors"
                 >
-                  Log in
+                  Sign In
                 </button>
                 <button 
-                  onClick={() => {
-                    onSignupClick();
-                    closeMenu();
-                  }}
-                  className="btn-primary w-full"
+                  onClick={() => handleAuthClick('signup')}
+                  className="bg-accent-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-accent-700 transition-colors w-full"
                 >
                   Get Started Free
                 </button>

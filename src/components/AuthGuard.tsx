@@ -54,15 +54,12 @@ const AuthGuard = ({ children }: AuthGuardProps) => {
 
   useEffect(() => {
     if (initialized && !loading && !user) {
-      // Trigger auth modal
-      const event = new CustomEvent('openAuthModal', { detail: { mode: 'login' } });
-      window.dispatchEvent(event);
-      navigate('/');
+      navigate('/auth?mode=login');
     }
   }, [user, loading, initialized, navigate]);
 
   // Show loading only if not initialized
-  if (!initialized) {
+  if (!initialized || loading) {
     return <LoadingSkeleton />;
   }
 
