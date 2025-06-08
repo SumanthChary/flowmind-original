@@ -5,7 +5,7 @@ The application is failing because the `profiles` table doesn't exist in your Su
 ## Steps to Fix:
 
 1. **Open Supabase Studio**
-   - Go to your Supabase project dashboard
+   - Go to your Supabase project dashboard at https://supabase.com/dashboard
    - Navigate to the "SQL Editor" tab
 
 2. **Execute the Migration**
@@ -28,4 +28,21 @@ The application is failing because the `profiles` table doesn't exist in your Su
 - Creates triggers for automatic profile creation and timestamp updates
 - Allows authenticated users to read and update their own profiles
 
-After running this migration, the authentication and profile functionality will work correctly.
+## Important Notes:
+
+- The application now includes fallback handling for when the profiles table doesn't exist
+- Users will see a temporary profile based on their auth data until the migration is run
+- All profile functionality will work normally once the migration is executed
+
+After running this migration, the authentication and profile functionality will work at full capacity with persistent data storage.
+
+## Alternative: Manual Table Creation
+
+If you prefer to create the table manually, you can also:
+
+1. Go to Table Editor in Supabase
+2. Create a new table called `profiles`
+3. Add the columns as specified in the migration file
+4. Set up the RLS policies manually
+
+However, running the migration SQL is the recommended approach as it includes all necessary triggers and policies.

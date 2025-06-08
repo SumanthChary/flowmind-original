@@ -67,6 +67,7 @@ const ProfilePage = () => {
         <motion.button
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.3 }}
           onClick={() => navigate('/dashboard')}
           className="flex items-center text-gray-600 hover:text-accent-600 mb-8 transition-colors"
         >
@@ -78,11 +79,16 @@ const ProfilePage = () => {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: 0.3 }}
             className="grid grid-cols-1 lg:grid-cols-3 gap-8"
           >
             {/* Profile Card */}
-            <div className="lg:col-span-1">
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3, delay: 0.1 }}
+              className="lg:col-span-1"
+            >
               <div className="bg-white rounded-xl shadow-soft p-6">
                 <div className="text-center">
                   <div className="relative inline-block mb-4">
@@ -120,7 +126,12 @@ const ProfilePage = () => {
               </div>
               
               {/* Quick Stats */}
-              <div className="mt-6 bg-white rounded-xl shadow-soft p-6">
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.2 }}
+                className="mt-6 bg-white rounded-xl shadow-soft p-6"
+              >
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Account Stats</h3>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
@@ -145,13 +156,18 @@ const ProfilePage = () => {
                     <span className="font-medium">24.5h</span>
                   </div>
                 </div>
-              </div>
-            </div>
+              </motion.div>
+            </motion.div>
 
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-6">
               {/* Profile Settings */}
-              <div className="bg-white rounded-xl shadow-soft p-6">
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.3, delay: 0.1 }}
+                className="bg-white rounded-xl shadow-soft p-6"
+              >
                 <h3 className="text-lg font-semibold text-gray-900 mb-6">Profile Settings</h3>
                 
                 <form onSubmit={handleUpdateProfile} className="space-y-6">
@@ -211,10 +227,15 @@ const ProfilePage = () => {
                     </button>
                   </div>
                 </form>
-              </div>
+              </motion.div>
 
               {/* Account Information */}
-              <div className="bg-white rounded-xl shadow-soft p-6">
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.3, delay: 0.2 }}
+                className="bg-white rounded-xl shadow-soft p-6"
+              >
                 <h3 className="text-lg font-semibold text-gray-900 mb-6">Account Information</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="bg-gray-50 rounded-lg p-4">
@@ -233,10 +254,15 @@ const ProfilePage = () => {
                     <p className="text-lg font-semibold text-success-600">Active</p>
                   </div>
                 </div>
-              </div>
+              </motion.div>
 
               {/* Security Settings */}
-              <div className="bg-white rounded-xl shadow-soft p-6">
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.3, delay: 0.3 }}
+                className="bg-white rounded-xl shadow-soft p-6"
+              >
                 <h3 className="text-lg font-semibold text-gray-900 mb-6">Security & Privacy</h3>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
@@ -259,7 +285,7 @@ const ProfilePage = () => {
                     </button>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             </div>
           </motion.div>
         </div>

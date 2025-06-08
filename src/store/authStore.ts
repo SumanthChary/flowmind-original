@@ -38,15 +38,27 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (!user) return;
     
     try {
+      // First check if profiles table exists by trying to query it
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching profile:', error);
-        return;
+      if (error) {
+        // If table doesn't exist, create a temporary profile from user metadata
+        if (error.code === '42P01' || error.message?.includes('does not exist')) {
+          console.warn('Profiles table does not exist. Using user metadata.');
+          const tempProfile: Profile = {
+            id: user.id,
+            full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || '',
+            avatar_url: user.user_metadata?.avatar_url || null,
+            updated_at: new Date().toISOString()
+          };
+          set({ profile: tempProfile });
+          return;
+        }
+        throw error;
       }
 
       if (data) {
@@ -58,8 +70,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           .insert([
             {
               id: user.id,
-              full_name: user.user_metadata?.full_name || '',
-              avatar_url: null,
+              full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || '',
+              avatar_url: user.user_metadata?.avatar_url || null,
             },
           ])
           .select()
@@ -67,12 +79,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
         if (createError) {
           console.error('Error creating profile:', createError);
+          // Fallback to temp profile
+          const tempProfile: Profile = {
+            id: user.id,
+            full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || '',
+            avatar_url: user.user_metadata?.avatar_url || null,
+            updated_at: new Date().toISOString()
+          };
+          set({ profile: tempProfile });
         } else {
           set({ profile: newProfile });
         }
       }
     } catch (error) {
       console.error('Error in fetchProfile:', error);
+      // Create fallback profile from user data
+      const tempProfile: Profile = {
+        id: user.id,
+        full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || '',
+        avatar_url: user.user_metadata?.avatar_url || null,
+        updated_at: new Date().toISOString()
+      };
+      set({ profile: tempProfile });
     }
   },
   
@@ -91,7 +119,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         .eq('id', user.id);
 
       if (error) {
-        // Revert on error
+        // If table doesn't exist, just keep the optimistic update
+        if (error.code === '42P01' || error.message?.includes('does not exist')) {
+          console.warn('Profiles table does not exist. Keeping local changes.');
+          return;
+        }
+        // Revert on other errors
         set({ profile });
         throw error;
       }

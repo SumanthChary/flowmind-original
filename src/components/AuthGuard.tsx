@@ -58,7 +58,7 @@ const AuthGuard = ({ children }: AuthGuardProps) => {
     }
   }, [user, loading, initialized, navigate]);
 
-  // Show loading only if not initialized
+  // Show loading only if not initialized or still loading
   if (!initialized || loading) {
     return <LoadingSkeleton />;
   }
