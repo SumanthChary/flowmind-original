@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Mail, LogOut, Camera, Save, Calendar, Shield, Activity, ArrowLeft } from 'lucide-react';
+import { User, Mail, LogOut, Camera, Save, Calendar, Shield, Activity, ArrowLeft, Upload, X } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -8,8 +8,11 @@ import toast from 'react-hot-toast';
 const ProfilePage = () => {
   const { user, profile, updateProfile, signOut } = useAuthStore();
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [fullName, setFullName] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState('');
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
   useEffect(() => {
     document.title = "Profile | FlowMind";
@@ -18,6 +21,7 @@ const ProfilePage = () => {
   useEffect(() => {
     if (profile) {
       setFullName(profile.full_name || '');
+      setAvatarUrl(profile.avatar_url || '');
     }
   }, [profile]);
 
@@ -39,7 +43,10 @@ const ProfilePage = () => {
     setIsLoading(true);
 
     try {
-      await updateProfile({ full_name: fullName.trim() });
+      await updateProfile({ 
+        full_name: fullName.trim(),
+        avatar_url: avatarUrl || null
+      });
       toast.success('Profile updated successfully!');
     } catch (error) {
       toast.error('Error updating profile');
@@ -47,6 +54,50 @@ const ProfilePage = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size must be less than 5MB');
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+
+    try {
+      // Convert file to base64 for preview (in a real app, you'd upload to a service like Supabase Storage)
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const result = event.target?.result as string;
+        setAvatarUrl(result);
+        toast.success('Image uploaded successfully! Click Save to update your profile.');
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      toast.error('Error uploading image');
+      console.error('Error:', error);
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
+  const handleRemoveAvatar = () => {
+    setAvatarUrl('');
+    toast.success('Avatar removed. Click Save to update your profile.');
   };
 
   const handleSignOut = async () => {
@@ -92,9 +143,9 @@ const ProfilePage = () => {
               <div className="bg-white rounded-xl shadow-soft p-6">
                 <div className="text-center">
                   <div className="relative inline-block mb-4">
-                    {profile?.avatar_url ? (
+                    {avatarUrl ? (
                       <img 
-                        src={profile.avatar_url} 
+                        src={avatarUrl} 
                         alt={displayName} 
                         className="w-24 h-24 rounded-full object-cover mx-auto"
                       />
@@ -105,9 +156,41 @@ const ProfilePage = () => {
                         </span>
                       </div>
                     )}
-                    <button className="absolute bottom-0 right-0 bg-white rounded-full p-2 shadow-medium hover:shadow-lg transition-shadow">
-                      <Camera size={16} className="text-gray-600" />
-                    </button>
+                    
+                    {/* Avatar Actions */}
+                    <div className="absolute bottom-0 right-0 flex space-x-1">
+                      <button
+                        onClick={handleAvatarClick}
+                        disabled={isUploadingAvatar}
+                        className="bg-white rounded-full p-2 shadow-medium hover:shadow-lg transition-shadow disabled:opacity-50"
+                        title="Upload new avatar"
+                      >
+                        {isUploadingAvatar ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-accent-600"></div>
+                        ) : (
+                          <Camera size={16} className="text-gray-600" />
+                        )}
+                      </button>
+                      
+                      {avatarUrl && (
+                        <button
+                          onClick={handleRemoveAvatar}
+                          className="bg-white rounded-full p-2 shadow-medium hover:shadow-lg transition-shadow text-error-600"
+                          title="Remove avatar"
+                        >
+                          <X size={16} />
+                        </button>
+                      )}
+                    </div>
+                    
+                    {/* Hidden file input */}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
                   </div>
                   
                   <h2 className="text-xl font-bold text-gray-900 mb-1">
@@ -204,6 +287,53 @@ const ProfilePage = () => {
                     </div>
                     <p className="mt-2 text-sm text-gray-500">
                       Email cannot be changed for security reasons
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Profile Picture
+                    </label>
+                    <div className="flex items-center space-x-4">
+                      <div className="relative">
+                        {avatarUrl ? (
+                          <img 
+                            src={avatarUrl} 
+                            alt="Profile preview" 
+                            className="w-16 h-16 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-16 h-16 bg-gradient-to-br from-accent-400 to-accent-600 rounded-full flex items-center justify-center">
+                            <span className="text-lg font-bold text-white">
+                              {initials}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex space-x-2">
+                        <button
+                          type="button"
+                          onClick={handleAvatarClick}
+                          disabled={isUploadingAvatar}
+                          className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                        >
+                          <Upload size={16} className="mr-2" />
+                          {isUploadingAvatar ? 'Uploading...' : 'Upload'}
+                        </button>
+                        {avatarUrl && (
+                          <button
+                            type="button"
+                            onClick={handleRemoveAvatar}
+                            className="flex items-center px-3 py-2 text-sm font-medium text-error-600 bg-error-50 border border-error-200 rounded-lg hover:bg-error-100 transition-colors"
+                          >
+                            <X size={16} className="mr-2" />
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <p className="mt-2 text-sm text-gray-500">
+                      Recommended: Square image, at least 200x200px, max 5MB
                     </p>
                   </div>
 

@@ -19,7 +19,7 @@ interface AuthState {
   setLoading: (loading: boolean) => void;
   setInitialized: (initialized: boolean) => void;
   fetchProfile: () => Promise<void>;
-  updateProfile: (updates: Partial<Profile>) => Promise<void>;
+  updateProfile: (updates: Partial<Omit<Profile, 'id' | 'updated_at'>>) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
