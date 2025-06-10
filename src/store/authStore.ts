@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { User } from '@supabase/supabase-js';
+import toast from 'react-hot-toast';
 
 interface Profile {
   id: string;
@@ -108,7 +109,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const { user, profile } = get();
     if (!user || !profile) return;
 
-    // Optimistic update
+    // Optimistic update for immediate UI feedback
     const updatedProfile = { ...profile, ...updates, updated_at: new Date().toISOString() };
     set({ profile: updatedProfile });
 
@@ -128,8 +129,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ profile });
         throw error;
       }
+
+      // Fetch the updated profile to ensure consistency
+      await get().fetchProfile();
+      
     } catch (error) {
       console.error('Error updating profile:', error);
+      // Revert optimistic update on error
+      set({ profile });
       throw error;
     }
   },

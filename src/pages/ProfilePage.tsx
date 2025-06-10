@@ -2,11 +2,13 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Mail, LogOut, Camera, Save, Calendar, Shield, Activity, ArrowLeft, Upload, X } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import { useWorkflowStore } from '../store/workflowStore';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 
 const ProfilePage = () => {
   const { user, profile, updateProfile, signOut } = useAuthStore();
+  const { workflows, executionLogs } = useWorkflowStore();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -32,6 +34,13 @@ const ProfilePage = () => {
     month: 'long',
     day: 'numeric'
   }) : 'Unknown';
+
+  // Calculate real stats
+  const activeWorkflows = workflows.filter(w => w.status === 'active').length;
+  const totalExecutions = executionLogs.length;
+  const successfulExecutions = executionLogs.filter(log => log.status === 'success').length;
+  const timeSavedMinutes = successfulExecutions * 5; // Estimate 5 minutes per successful execution
+  const timeSavedHours = Math.round(timeSavedMinutes / 60 * 10) / 10;
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -222,21 +231,21 @@ const ProfilePage = () => {
                       <Activity size={16} className="text-accent-600 mr-2" />
                       <span className="text-sm text-gray-600">Workflows</span>
                     </div>
-                    <span className="font-medium">12</span>
+                    <span className="font-medium">{activeWorkflows}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
                       <Shield size={16} className="text-success-600 mr-2" />
                       <span className="text-sm text-gray-600">Tasks Automated</span>
                     </div>
-                    <span className="font-medium">1,247</span>
+                    <span className="font-medium">{totalExecutions.toLocaleString()}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
                       <Calendar size={16} className="text-primary-600 mr-2" />
                       <span className="text-sm text-gray-600">Time Saved</span>
                     </div>
-                    <span className="font-medium">24.5h</span>
+                    <span className="font-medium">{timeSavedHours}h</span>
                   </div>
                 </div>
               </motion.div>
