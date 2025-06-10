@@ -16,7 +16,8 @@ import {
   ArrowUpRight,
   Play,
   Pause,
-  MoreVertical
+  MoreVertical,
+  Workflow
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { motion } from 'framer-motion';
@@ -233,10 +234,13 @@ const DashboardPage = () => {
             >
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-lg font-semibold text-gray-900">Active Workflows</h2>
-                <button className="btn-primary">
+                <Link 
+                  to="/workflow-builder"
+                  className="btn-primary flex items-center"
+                >
                   <Plus size={16} className="mr-2" />
                   New Workflow
-                </button>
+                </Link>
               </div>
               <div className="space-y-4">
                 {workflows.map((workflow, index) => (
@@ -314,10 +318,13 @@ const DashboardPage = () => {
               <p className="text-accent-100 text-sm mb-4">
                 Automate your tasks in minutes
               </p>
-              <button className="w-full bg-white text-accent-600 font-medium py-2 px-4 rounded-lg hover:bg-accent-50 transition-colors flex items-center justify-center">
-                <Plus size={16} className="mr-2" />
+              <Link 
+                to="/workflow-builder"
+                className="w-full bg-white text-accent-600 font-medium py-2 px-4 rounded-lg hover:bg-accent-50 transition-colors flex items-center justify-center"
+              >
+                <Workflow size={16} className="mr-2" />
                 Get Started
-              </button>
+              </Link>
             </motion.div>
 
             {/* Recent Activity */}
@@ -368,6 +375,10 @@ const DashboardPage = () => {
                 <BarChart2 size={18} className="mr-3" />
                 Overview
               </a>
+              <Link to="/workflow-builder" className="flex items-center px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
+                <Workflow size={18} className="mr-3" />
+                Workflow Builder
+              </Link>
               <a href="#" className="flex items-center px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
                 <FileText size={18} className="mr-3" />
                 Workflows

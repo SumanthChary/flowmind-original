@@ -10,6 +10,7 @@ import AboutPage from './pages/AboutPage';
 import AuthPage from './pages/AuthPage';
 import DashboardPage from './pages/DashboardPage';
 import ProfilePage from './pages/ProfilePage';
+import WorkflowBuilderPage from './pages/WorkflowBuilderPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 function App() {
@@ -39,6 +40,13 @@ function App() {
           } />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
+        
+        {/* Workflow Builder - Full screen without layout */}
+        <Route path="/workflow-builder" element={
+          <AuthGuard>
+            <WorkflowBuilderPage />
+          </AuthGuard>
+        } />
       </Routes>
       <Toaster position="top-right" />
     </>
