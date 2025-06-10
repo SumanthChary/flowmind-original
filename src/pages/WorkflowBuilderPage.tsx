@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Save, Play, Settings, Clock } from 'lucide-react';
-import WorkflowBuilder from '../components/workflow/WorkflowBuilder';
+import EnhancedWorkflowBuilder from '../components/workflow/EnhancedWorkflowBuilder';
 import { useWorkflowStore } from '../store/workflowStore';
 import toast from 'react-hot-toast';
 
@@ -21,7 +21,7 @@ const WorkflowBuilderPage = () => {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
   useEffect(() => {
-    document.title = "Workflow Builder | FlowMind";
+    document.title = "Enhanced Workflow Builder | FlowMind";
     
     if (workflowId) {
       // Load existing workflow
@@ -90,11 +90,11 @@ const WorkflowBuilderPage = () => {
           
           <div>
             <h1 className="text-lg font-semibold text-gray-900">
-              {currentWorkflow.name}
+              Enhanced Workflow Builder
             </h1>
-            {currentWorkflow.description && (
-              <p className="text-sm text-gray-600">{currentWorkflow.description}</p>
-            )}
+            <p className="text-sm text-gray-600">
+              {currentWorkflow.name} - {currentWorkflow.description || 'No description'}
+            </p>
           </div>
         </div>
         
@@ -119,9 +119,9 @@ const WorkflowBuilderPage = () => {
         </div>
       </div>
 
-      {/* Workflow Builder */}
+      {/* Enhanced Workflow Builder */}
       <div className="flex-1">
-        <WorkflowBuilder 
+        <EnhancedWorkflowBuilder 
           workflowId={currentWorkflow.id}
           onSave={handleSave} 
         />
