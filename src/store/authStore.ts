@@ -16,11 +16,13 @@ interface AuthState {
   loading: boolean;
   initialized: boolean;
   profilesTableExists: boolean;
+  tableCheckComplete: boolean;
   setUser: (user: User | null) => void;
   setProfile: (profile: Profile | null) => void;
   setLoading: (loading: boolean) => void;
   setInitialized: (initialized: boolean) => void;
   setProfilesTableExists: (exists: boolean) => void;
+  setTableCheckComplete: (complete: boolean) => void;
   fetchProfile: () => Promise<void>;
   updateProfile: (updates: Partial<Omit<Profile, 'id' | 'updated_at'>>) => Promise<void>;
   signOut: () => Promise<void>;
@@ -33,64 +35,78 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   loading: false,
   initialized: false,
   profilesTableExists: false,
+  tableCheckComplete: false,
   setUser: (user) => set({ user }),
   setProfile: (profile) => set({ profile }),
   setLoading: (loading) => set({ loading }),
   setInitialized: (initialized) => set({ initialized }),
   setProfilesTableExists: (exists) => set({ profilesTableExists: exists }),
+  setTableCheckComplete: (complete) => set({ tableCheckComplete: complete }),
   
   checkProfilesTable: async () => {
-    try {
-      // Try a simple query to check if the table exists
-      // Use a more specific query that's less likely to cause console errors
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id')
-        .limit(1)
-        .maybeSingle();
+    const { tableCheckComplete, profilesTableExists } = get();
+    
+    // Return cached result if check was already completed
+    if (tableCheckComplete) {
+      return profilesTableExists;
+    }
 
-      if (error) {
-        // Check for table not found errors specifically
-        if (error.code === '42P01' || 
-            error.message?.includes('does not exist') || 
-            error.message?.includes('relation') ||
-            error.details?.includes('does not exist')) {
-          set({ profilesTableExists: false });
-          return false;
+    try {
+      // Use a more targeted approach to check table existence
+      // This query will fail gracefully if the table doesn't exist
+      const { error } = await supabase.rpc('check_table_exists', { table_name: 'profiles' });
+      
+      // If the RPC doesn't exist, fall back to a simple select
+      if (error && error.code === '42883') {
+        const { error: selectError } = await supabase
+          .from('profiles')
+          .select('id')
+          .limit(0); // Don't actually fetch any data
+        
+        if (selectError) {
+          if (selectError.code === '42P01' || 
+              selectError.message?.includes('does not exist') || 
+              selectError.message?.includes('relation')) {
+            set({ profilesTableExists: false, tableCheckComplete: true });
+            return false;
+          }
         }
-        // Other errors might be permissions related, assume table exists
-        set({ profilesTableExists: true });
+        
+        set({ profilesTableExists: true, tableCheckComplete: true });
         return true;
       }
       
-      set({ profilesTableExists: true });
+      set({ profilesTableExists: true, tableCheckComplete: true });
       return true;
     } catch (error: any) {
       // Handle network or other unexpected errors
       if (error?.code === '42P01' || 
           error?.message?.includes('does not exist') ||
           error?.message?.includes('relation')) {
-        set({ profilesTableExists: false });
+        set({ profilesTableExists: false, tableCheckComplete: true });
         return false;
       }
       
       // For other errors, assume table exists to avoid blocking functionality
       console.warn('Unable to verify profiles table existence:', error);
-      set({ profilesTableExists: true });
+      set({ profilesTableExists: true, tableCheckComplete: true });
       return true;
     }
   },
   
   fetchProfile: async () => {
-    const { user } = get();
+    const { user, profilesTableExists, tableCheckComplete } = get();
     if (!user) return;
     
     try {
-      // Check if profiles table exists first
-      const tableExists = await get().checkProfilesTable();
+      // Always check table existence first if not already done
+      let tableExists = profilesTableExists;
+      if (!tableCheckComplete) {
+        tableExists = await get().checkProfilesTable();
+      }
       
       if (!tableExists) {
-        // Silently create temporary profile without logging warnings
+        // Create temporary profile without making any database requests
         const tempProfile: Profile = {
           id: user.id,
           full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || '',
@@ -111,7 +127,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (error) {
         // Check if this is a table not found error that slipped through
         if (error.code === '42P01' || error.message?.includes('does not exist')) {
-          set({ profilesTableExists: false });
+          set({ profilesTableExists: false, tableCheckComplete: true });
           const tempProfile: Profile = {
             id: user.id,
             full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || '',
@@ -167,15 +183,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
   
   updateProfile: async (updates) => {
-    const { user, profile, profilesTableExists } = get();
+    const { user, profile, profilesTableExists, tableCheckComplete } = get();
     if (!user || !profile) return;
 
     // Optimistic update for immediate UI feedback
     const updatedProfile = { ...profile, ...updates, updated_at: new Date().toISOString() };
     set({ profile: updatedProfile });
 
+    // Check table existence if not already done
+    let tableExists = profilesTableExists;
+    if (!tableCheckComplete) {
+      tableExists = await get().checkProfilesTable();
+    }
+
     // If profiles table doesn't exist, just keep the local update
-    if (!profilesTableExists) {
+    if (!tableExists) {
       // Show a subtle notification only once per session
       if (!sessionStorage.getItem('migration-notice-shown')) {
         toast('Profile updated locally. Run database migration for persistence.', {
@@ -196,7 +218,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (error) {
         // Check if table was deleted after our initial check
         if (error.code === '42P01' || error.message?.includes('does not exist')) {
-          set({ profilesTableExists: false });
+          set({ profilesTableExists: false, tableCheckComplete: true });
           if (!sessionStorage.getItem('migration-notice-shown')) {
             toast('Profile updated locally. Database migration required for persistence.', {
               icon: 'ℹ️',
@@ -232,7 +254,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      set({ user: null, profile: null, profilesTableExists: false });
+      set({ 
+        user: null, 
+        profile: null, 
+        profilesTableExists: false, 
+        tableCheckComplete: false 
+      });
       // Clear session storage on sign out
       sessionStorage.removeItem('migration-notice-shown');
     } catch (error) {
@@ -260,12 +287,25 @@ const initializeAuth = async () => {
     store.setUser(session?.user ?? null);
     store.setInitialized(true);
     
-    // Fetch profile if user exists (non-blocking)
+    // Check table existence first, then fetch profile if user exists
     if (session?.user) {
-      // Don't await to make initialization faster
-      store.fetchProfile().catch(() => {
-        // Silently handle errors during initialization
-      });
+      // Check table existence first to prevent unnecessary API calls
+      const tableExists = await store.checkProfilesTable();
+      if (tableExists) {
+        // Only fetch profile if table exists
+        store.fetchProfile().catch(() => {
+          // Silently handle errors during initialization
+        });
+      } else {
+        // Create temporary profile immediately if table doesn't exist
+        const tempProfile: Profile = {
+          id: session.user.id,
+          full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || '',
+          avatar_url: session.user.user_metadata?.avatar_url || null,
+          updated_at: new Date().toISOString()
+        };
+        store.setProfile(tempProfile);
+      }
     }
   } catch (error) {
     console.error('Error initializing auth:', error);
@@ -290,14 +330,29 @@ supabase.auth.onAuthStateChange(async (event, session) => {
   authChangeTimeout = setTimeout(async () => {
     if (event === 'SIGNED_IN' && session?.user) {
       store.setUser(session.user);
-      // Fetch profile asynchronously for better performance
-      store.fetchProfile().catch(() => {
-        // Silently handle errors during auth state changes
-      });
+      
+      // Check table existence before attempting to fetch profile
+      const tableExists = await store.checkProfilesTable();
+      if (tableExists) {
+        // Fetch profile asynchronously for better performance
+        store.fetchProfile().catch(() => {
+          // Silently handle errors during auth state changes
+        });
+      } else {
+        // Create temporary profile immediately if table doesn't exist
+        const tempProfile: Profile = {
+          id: session.user.id,
+          full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || '',
+          avatar_url: session.user.user_metadata?.avatar_url || null,
+          updated_at: new Date().toISOString()
+        };
+        store.setProfile(tempProfile);
+      }
     } else if (event === 'SIGNED_OUT') {
       store.setUser(null);
       store.setProfile(null);
       store.setProfilesTableExists(false);
+      store.setTableCheckComplete(false);
       sessionStorage.removeItem('migration-notice-shown');
     }
   }, 100); // 100ms debounce
