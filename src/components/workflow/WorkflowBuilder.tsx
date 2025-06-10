@@ -1,4 +1,4 @@
-import { useCallback, useState, useRef } from 'react';
+import { useCallback, useState, useRef, useEffect } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -13,9 +13,10 @@ import ReactFlow, {
   ReactFlowProvider,
   ReactFlowInstance,
   NodeTypes,
+  useReactFlow,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Play, 
   Save, 
@@ -31,7 +32,20 @@ import {
   Webhook,
   Filter,
   Timer,
-  MessageSquare
+  MessageSquare,
+  Pause,
+  Square,
+  RotateCcw,
+  RotateCw,
+  Trash2,
+  Copy,
+  Power,
+  PowerOff,
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  MoreVertical,
+  X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -41,6 +55,15 @@ import ActionNode from './nodes/ActionNode';
 import ConditionNode from './nodes/ConditionNode';
 import DelayNode from './nodes/DelayNode';
 
+// Store
+import { useWorkflowStore, WorkflowNode, WorkflowEdge } from '../../store/workflowStore';
+
+// Components
+import NodePropertiesPanel from './NodePropertiesPanel';
+import WorkflowSettingsPanel from './WorkflowSettingsPanel';
+import ExecutionLogsPanel from './ExecutionLogsPanel';
+import ContextMenu from './ContextMenu';
+
 // Node types mapping
 const nodeTypes: NodeTypes = {
   trigger: TriggerNode,
@@ -48,23 +71,6 @@ const nodeTypes: NodeTypes = {
   condition: ConditionNode,
   delay: DelayNode,
 };
-
-// Initial nodes and edges
-const initialNodes: Node[] = [
-  {
-    id: '1',
-    type: 'trigger',
-    position: { x: 250, y: 50 },
-    data: { 
-      label: 'Email Received',
-      icon: <Mail size={20} />,
-      type: 'email',
-      config: {}
-    },
-  },
-];
-
-const initialEdges: Edge[] = [];
 
 // Sidebar node templates
 const nodeTemplates = [
@@ -146,17 +152,83 @@ interface WorkflowBuilderProps {
 }
 
 const WorkflowBuilderContent = ({ workflowId, onSave }: WorkflowBuilderProps) => {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const {
+    currentWorkflow,
+    isExecuting,
+    executionProgress,
+    selectedNodeId,
+    addNode,
+    updateNode,
+    deleteNode,
+    duplicateNode,
+    toggleNodeActive,
+    setSelectedNode,
+    addEdge: addWorkflowEdge,
+    deleteEdge,
+    validateConnection,
+    executeWorkflow,
+    pauseExecution,
+    stopExecution,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    saveWorkflow,
+  } = useWorkflowStore();
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(currentWorkflow?.nodes || []);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(currentWorkflow?.edges || []);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
-  const [selectedNode, setSelectedNode] = useState<Node | null>(null);
-  const [isRunning, setIsRunning] = useState(false);
-  const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [draggedType, setDraggedType] = useState<string | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showLogs, setShowLogs] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    nodeId?: string;
+    edgeId?: string;
+  } | null>(null);
+
+  const reactFlowWrapper = useRef<HTMLDivElement>(null);
+
+  // Sync with store
+  useEffect(() => {
+    if (currentWorkflow) {
+      setNodes(currentWorkflow.nodes);
+      setEdges(currentWorkflow.edges);
+    }
+  }, [currentWorkflow, setNodes, setEdges]);
+
+  // Update store when nodes/edges change
+  useEffect(() => {
+    if (currentWorkflow) {
+      useWorkflowStore.setState({
+        currentWorkflow: {
+          ...currentWorkflow,
+          nodes,
+          edges,
+        },
+      });
+    }
+  }, [nodes, edges, currentWorkflow]);
 
   const onConnect = useCallback(
-    (params: Connection) => setEdges((eds) => addEdge(params, eds)),
-    [setEdges]
+    (params: Connection) => {
+      if (validateConnection(params)) {
+        const newEdge: WorkflowEdge = {
+          ...params,
+          id: `edge-${Date.now()}`,
+          type: 'smoothstep',
+          animated: true,
+          data: { status: 'idle' },
+        };
+        setEdges((eds) => addEdge(newEdge, eds));
+        addWorkflowEdge(newEdge);
+      } else {
+        toast.error('Invalid connection');
+      }
+    },
+    [validateConnection, setEdges, addWorkflowEdge]
   );
 
   const onInit = (instance: ReactFlowInstance) => {
@@ -187,7 +259,7 @@ const WorkflowBuilderContent = ({ workflowId, onSave }: WorkflowBuilderProps) =>
       const template = nodeTemplates.find(t => t.type === type);
       if (!template) return;
 
-      const newNode: Node = {
+      const newNode: WorkflowNode = {
         id: `${type}-${Date.now()}`,
         type,
         position,
@@ -195,13 +267,16 @@ const WorkflowBuilderContent = ({ workflowId, onSave }: WorkflowBuilderProps) =>
           label: template.label,
           icon: template.icon,
           type: template.type,
-          config: {}
+          config: {},
+          active: true,
+          status: 'idle',
         },
       };
 
       setNodes((nds) => nds.concat(newNode));
+      addNode(newNode);
     },
-    [reactFlowInstance, setNodes]
+    [reactFlowInstance, setNodes, addNode]
   );
 
   const onDragStart = (event: React.DragEvent, nodeType: string) => {
@@ -215,47 +290,36 @@ const WorkflowBuilderContent = ({ workflowId, onSave }: WorkflowBuilderProps) =>
   };
 
   const handleSave = () => {
-    if (!reactFlowInstance) return;
+    if (!currentWorkflow || !reactFlowInstance) return;
 
     const flow = reactFlowInstance.toObject();
-    const workflow = {
-      id: workflowId || `workflow-${Date.now()}`,
-      name: 'Untitled Workflow',
+    const updatedWorkflow = {
+      ...currentWorkflow,
       nodes: flow.nodes,
       edges: flow.edges,
       viewport: flow.viewport,
-      createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
+    saveWorkflow(updatedWorkflow);
     if (onSave) {
-      onSave(workflow);
+      onSave(updatedWorkflow);
     }
-
-    // Save to localStorage for now
-    localStorage.setItem(`workflow-${workflow.id}`, JSON.stringify(workflow));
-    toast.success('Workflow saved successfully!');
   };
 
   const handleRun = async () => {
-    setIsRunning(true);
-    toast.loading('Running workflow...', { id: 'workflow-run' });
-    
-    // Simulate workflow execution
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    setIsRunning(false);
-    toast.success('Workflow executed successfully!', { id: 'workflow-run' });
+    if (!currentWorkflow) return;
+    await executeWorkflow(currentWorkflow.id);
   };
 
   const handleExport = () => {
-    if (!reactFlowInstance) return;
+    if (!reactFlowInstance || !currentWorkflow) return;
 
     const flow = reactFlowInstance.toObject();
     const dataStr = JSON.stringify(flow, null, 2);
     const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
     
-    const exportFileDefaultName = 'workflow.json';
+    const exportFileDefaultName = `${currentWorkflow.name.replace(/\s+/g, '-')}.json`;
     const linkElement = document.createElement('a');
     linkElement.setAttribute('href', dataUri);
     linkElement.setAttribute('download', exportFileDefaultName);
@@ -263,8 +327,91 @@ const WorkflowBuilderContent = ({ workflowId, onSave }: WorkflowBuilderProps) =>
   };
 
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
-    setSelectedNode(node);
+    setSelectedNode(node.id);
+    setContextMenu(null);
+  }, [setSelectedNode]);
+
+  const onNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {
+    event.preventDefault();
+    setContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      nodeId: node.id,
+    });
   }, []);
+
+  const onEdgeContextMenu = useCallback((event: React.MouseEvent, edge: Edge) => {
+    event.preventDefault();
+    setContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      edgeId: edge.id,
+    });
+  }, []);
+
+  const onPaneClick = useCallback(() => {
+    setSelectedNode(null);
+    setContextMenu(null);
+  }, [setSelectedNode]);
+
+  const handleContextMenuAction = (action: string, id?: string) => {
+    if (!id) return;
+
+    switch (action) {
+      case 'delete':
+        if (contextMenu?.nodeId) {
+          deleteNode(id);
+          setNodes((nds) => nds.filter((node) => node.id !== id));
+        } else if (contextMenu?.edgeId) {
+          deleteEdge(id);
+          setEdges((eds) => eds.filter((edge) => edge.id !== id));
+        }
+        break;
+      case 'duplicate':
+        duplicateNode(id);
+        break;
+      case 'toggle':
+        toggleNodeActive(id);
+        break;
+    }
+    setContextMenu(null);
+  };
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey) {
+        switch (event.key) {
+          case 's':
+            event.preventDefault();
+            handleSave();
+            break;
+          case 'z':
+            event.preventDefault();
+            if (event.shiftKey) {
+              redo();
+            } else {
+              undo();
+            }
+            break;
+          case 'r':
+            event.preventDefault();
+            handleRun();
+            break;
+          case 'Delete':
+          case 'Backspace':
+            if (selectedNodeId) {
+              deleteNode(selectedNodeId);
+              setNodes((nds) => nds.filter((node) => node.id !== selectedNodeId));
+            }
+            break;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedNodeId, handleSave, handleRun, undo, redo, deleteNode, setNodes]);
 
   const groupedTemplates = nodeTemplates.reduce((acc, template) => {
     if (!acc[template.category]) {
@@ -273,6 +420,8 @@ const WorkflowBuilderContent = ({ workflowId, onSave }: WorkflowBuilderProps) =>
     acc[template.category].push(template);
     return acc;
   }, {} as Record<string, typeof nodeTemplates>);
+
+  const selectedNode = nodes.find(node => node.id === selectedNodeId);
 
   return (
     <div className="h-screen flex bg-gray-50">
@@ -293,32 +442,71 @@ const WorkflowBuilderContent = ({ workflowId, onSave }: WorkflowBuilderProps) =>
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={handleRun}
-              disabled={isRunning}
+              disabled={isExecuting || !currentWorkflow?.nodes.length}
               className="flex items-center justify-center px-3 py-2 bg-success-600 text-white rounded-lg hover:bg-success-700 transition-colors disabled:opacity-50 text-sm"
+              title="Run workflow (Ctrl+R)"
             >
               <Play size={16} className="mr-1" />
-              {isRunning ? 'Running...' : 'Run'}
+              {isExecuting ? 'Running...' : 'Run'}
             </button>
             <button
               onClick={handleSave}
               className="flex items-center justify-center px-3 py-2 bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-colors text-sm"
+              title="Save workflow (Ctrl+S)"
             >
               <Save size={16} className="mr-1" />
               Save
             </button>
           </div>
-          <div className="grid grid-cols-2 gap-2 mt-2">
-            <button
-              onClick={handleExport}
-              className="flex items-center justify-center px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm"
-            >
-              <Download size={16} className="mr-1" />
-              Export
-            </button>
-            <button className="flex items-center justify-center px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm">
-              <Upload size={16} className="mr-1" />
-              Import
-            </button>
+          
+          <div className="grid grid-cols-3 gap-2 mt-2">
+            {isExecuting ? (
+              <>
+                <button
+                  onClick={pauseExecution}
+                  className="flex items-center justify-center px-2 py-2 bg-warning-600 text-white rounded-lg hover:bg-warning-700 transition-colors text-sm"
+                  title="Pause execution"
+                >
+                  <Pause size={16} />
+                </button>
+                <button
+                  onClick={stopExecution}
+                  className="flex items-center justify-center px-2 py-2 bg-error-600 text-white rounded-lg hover:bg-error-700 transition-colors text-sm"
+                  title="Stop execution"
+                >
+                  <Square size={16} />
+                </button>
+                <div className="flex items-center justify-center px-2 py-2 bg-gray-100 rounded-lg text-sm">
+                  {Math.round(executionProgress)}%
+                </div>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={undo}
+                  disabled={!canUndo()}
+                  className="flex items-center justify-center px-2 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 text-sm"
+                  title="Undo (Ctrl+Z)"
+                >
+                  <RotateCcw size={16} />
+                </button>
+                <button
+                  onClick={redo}
+                  disabled={!canRedo()}
+                  className="flex items-center justify-center px-2 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 text-sm"
+                  title="Redo (Ctrl+Shift+Z)"
+                >
+                  <RotateCw size={16} />
+                </button>
+                <button
+                  onClick={handleExport}
+                  className="flex items-center justify-center px-2 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm"
+                  title="Export workflow"
+                >
+                  <Download size={16} />
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -365,17 +553,37 @@ const WorkflowBuilderContent = ({ workflowId, onSave }: WorkflowBuilderProps) =>
         <div className="bg-white border-b border-gray-200 p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <h1 className="text-lg font-semibold text-gray-900">Untitled Workflow</h1>
+              <h1 className="text-lg font-semibold text-gray-900">
+                {currentWorkflow?.name || 'Untitled Workflow'}
+              </h1>
               <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
                 {nodes.length} nodes, {edges.length} connections
               </span>
+              {isExecuting && (
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-success-500 rounded-full animate-pulse"></div>
+                  <span className="text-sm text-success-600">Executing...</span>
+                </div>
+              )}
             </div>
             <div className="flex items-center space-x-2">
-              <button className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
-                <Settings size={18} />
+              <button 
+                onClick={() => setShowLogs(!showLogs)}
+                className={`p-2 rounded-lg transition-colors ${
+                  showLogs ? 'bg-accent-100 text-accent-600' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+                title="Execution logs"
+              >
+                <Clock size={18} />
               </button>
-              <button className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
-                <Zap size={18} />
+              <button 
+                onClick={() => setShowSettings(!showSettings)}
+                className={`p-2 rounded-lg transition-colors ${
+                  showSettings ? 'bg-accent-100 text-accent-600' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+                title="Workflow settings"
+              >
+                <Settings size={18} />
               </button>
             </div>
           </div>
@@ -393,10 +601,14 @@ const WorkflowBuilderContent = ({ workflowId, onSave }: WorkflowBuilderProps) =>
             onDrop={onDrop}
             onDragOver={onDragOver}
             onNodeClick={onNodeClick}
+            onNodeContextMenu={onNodeContextMenu}
+            onEdgeContextMenu={onEdgeContextMenu}
+            onPaneClick={onPaneClick}
             nodeTypes={nodeTypes}
             fitView
             attributionPosition="bottom-left"
             className="bg-gray-50"
+            deleteKeyCode={['Delete', 'Backspace']}
           >
             <Background 
               variant={BackgroundVariant.Dots} 
@@ -409,7 +621,15 @@ const WorkflowBuilderContent = ({ workflowId, onSave }: WorkflowBuilderProps) =>
             />
             <MiniMap 
               className="bg-white border border-gray-200 rounded-lg shadow-sm"
-              nodeColor="#8b5cf6"
+              nodeColor={(node) => {
+                switch (node.type) {
+                  case 'trigger': return '#3b68ed';
+                  case 'action': return '#8b5cf6';
+                  case 'condition': return '#f59e0b';
+                  case 'delay': return '#6b7280';
+                  default: return '#8b5cf6';
+                }
+              }}
               maskColor="rgba(0, 0, 0, 0.1)"
             />
           </ReactFlow>
@@ -417,81 +637,56 @@ const WorkflowBuilderContent = ({ workflowId, onSave }: WorkflowBuilderProps) =>
       </div>
 
       {/* Properties Panel */}
-      {selectedNode && (
-        <motion.div 
-          initial={{ x: 300 }}
-          animate={{ x: 0 }}
-          className="w-80 bg-white border-l border-gray-200 p-6"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Properties</h3>
-            <button 
-              onClick={() => setSelectedNode(null)}
-              className="text-gray-400 hover:text-gray-600"
-            >
-              ×
-            </button>
-          </div>
-          
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Node Type
-              </label>
-              <div className="flex items-center p-3 bg-gray-50 rounded-lg">
-                <div className="text-accent-600 mr-2">
-                  {selectedNode.data.icon}
-                </div>
-                <span className="font-medium">{selectedNode.data.label}</span>
-              </div>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Node ID
-              </label>
-              <input
-                type="text"
-                value={selectedNode.id}
-                disabled
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Label
-              </label>
-              <input
-                type="text"
-                value={selectedNode.data.label}
-                onChange={(e) => {
-                  setNodes((nds) =>
-                    nds.map((node) =>
-                      node.id === selectedNode.id
-                        ? { ...node, data: { ...node.data, label: e.target.value } }
-                        : node
-                    )
-                  );
-                  setSelectedNode({
-                    ...selectedNode,
-                    data: { ...selectedNode.data, label: e.target.value }
-                  });
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-              />
-            </div>
-            
-            {/* Node-specific configuration would go here */}
-            <div className="pt-4 border-t border-gray-200">
-              <h4 className="text-sm font-medium text-gray-700 mb-2">Configuration</h4>
-              <p className="text-sm text-gray-500">
-                Node-specific settings will appear here based on the selected node type.
-              </p>
-            </div>
-          </div>
-        </motion.div>
-      )}
+      <AnimatePresence>
+        {selectedNode && (
+          <NodePropertiesPanel
+            node={selectedNode}
+            onClose={() => setSelectedNode(null)}
+            onUpdate={(updates) => updateNode(selectedNode.id, updates)}
+            onDelete={() => {
+              deleteNode(selectedNode.id);
+              setNodes((nds) => nds.filter((node) => node.id !== selectedNode.id));
+              setSelectedNode(null);
+            }}
+            onDuplicate={() => duplicateNode(selectedNode.id)}
+            onToggleActive={() => toggleNodeActive(selectedNode.id)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Settings Panel */}
+      <AnimatePresence>
+        {showSettings && currentWorkflow && (
+          <WorkflowSettingsPanel
+            workflow={currentWorkflow}
+            onClose={() => setShowSettings(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Execution Logs Panel */}
+      <AnimatePresence>
+        {showLogs && currentWorkflow && (
+          <ExecutionLogsPanel
+            workflowId={currentWorkflow.id}
+            onClose={() => setShowLogs(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Context Menu */}
+      <AnimatePresence>
+        {contextMenu && (
+          <ContextMenu
+            x={contextMenu.x}
+            y={contextMenu.y}
+            nodeId={contextMenu.nodeId}
+            edgeId={contextMenu.edgeId}
+            onAction={handleContextMenuAction}
+            onClose={() => setContextMenu(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

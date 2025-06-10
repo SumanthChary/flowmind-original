@@ -1,25 +1,46 @@
 import { Handle, Position, NodeProps } from 'reactflow';
 import { motion } from 'framer-motion';
-import { Play } from 'lucide-react';
+import { Play, Power, PowerOff, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { WorkflowNode } from '../../../store/workflowStore';
 
-interface ActionNodeData {
-  label: string;
-  icon: React.ReactNode;
-  type: string;
-  config: Record<string, any>;
-}
+const ActionNode = ({ data, selected }: NodeProps<WorkflowNode['data']>) => {
+  const getStatusIndicator = () => {
+    switch (data.status) {
+      case 'running':
+        return <Clock size={14} className="text-warning-600 animate-spin" />;
+      case 'success':
+        return <CheckCircle size={14} className="text-success-600" />;
+      case 'error':
+        return <AlertCircle size={14} className="text-error-600" />;
+      default:
+        return null;
+    }
+  };
 
-const ActionNode = ({ data, selected }: NodeProps<ActionNodeData>) => {
   return (
     <motion.div
-      className={`px-4 py-3 shadow-lg rounded-lg bg-gradient-to-r from-accent-500 to-accent-600 border-2 min-w-[200px] ${
+      className={`px-4 py-3 shadow-lg rounded-lg bg-gradient-to-r from-accent-500 to-accent-600 border-2 min-w-[200px] relative ${
         selected ? 'border-accent-300' : 'border-transparent'
-      }`}
+      } ${!data.active ? 'opacity-60' : ''}`}
       whileHover={{ scale: 1.02 }}
       initial={{ scale: 0.8, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       transition={{ duration: 0.2 }}
     >
+      {/* Status indicators */}
+      <div className="absolute -top-2 -right-2 flex space-x-1">
+        {getStatusIndicator()}
+        <div className={`w-4 h-4 rounded-full flex items-center justify-center ${
+          data.active ? 'bg-success-500' : 'bg-gray-400'
+        }`}>
+          {data.active ? (
+            <Power size={10} className="text-white" />
+          ) : (
+            <PowerOff size={10} className="text-white" />
+          )}
+        </div>
+      </div>
+
       <Handle
         type="target"
         position={Position.Left}
@@ -37,6 +58,14 @@ const ActionNode = ({ data, selected }: NodeProps<ActionNodeData>) => {
           <div className="text-accent-100 text-xs">Action</div>
         </div>
       </div>
+      
+      {/* Execution info */}
+      {data.lastExecuted && (
+        <div className="mt-2 text-xs text-accent-100">
+          Last: {new Date(data.lastExecuted).toLocaleTimeString()}
+          {data.executionTime && ` (${data.executionTime}ms)`}
+        </div>
+      )}
       
       <Handle
         type="source"
