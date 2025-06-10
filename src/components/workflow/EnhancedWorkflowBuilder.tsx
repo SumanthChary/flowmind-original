@@ -4,8 +4,6 @@ import ReactFlow, {
   Edge,
   addEdge,
   Connection,
-  useNodesState,
-  useEdgesState,
   Controls,
   Background,
   BackgroundVariant,
@@ -189,6 +187,8 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
     isExecuting,
     executionProgress,
     selectedNodeId,
+    onNodesChangeRF,
+    onEdgesChangeRF,
     addNode,
     updateNode,
     deleteNode,
@@ -211,8 +211,6 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
     setCurrentWorkflow,
   } = useWorkflowStore();
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(currentWorkflow?.nodes || []);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(currentWorkflow?.edges || []);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
   const [draggedType, setDraggedType] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -228,26 +226,9 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Sync with store
-  useEffect(() => {
-    if (currentWorkflow) {
-      setNodes(currentWorkflow.nodes);
-      setEdges(currentWorkflow.edges);
-    }
-  }, [currentWorkflow, setNodes, setEdges]);
-
-  // Update store when nodes/edges change
-  useEffect(() => {
-    if (currentWorkflow) {
-      useWorkflowStore.setState({
-        currentWorkflow: {
-          ...currentWorkflow,
-          nodes,
-          edges,
-        },
-      });
-    }
-  }, [nodes, edges, currentWorkflow]);
+  // Get nodes and edges directly from the store
+  const nodes = currentWorkflow?.nodes || [];
+  const edges = currentWorkflow?.edges || [];
 
   const onConnect = useCallback(
     (params: Connection) => {
@@ -259,13 +240,12 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
           animated: true,
           data: { status: 'idle' },
         };
-        setEdges((eds) => addEdge(newEdge, eds));
         addWorkflowEdge(newEdge);
       } else {
         toast.error('Invalid connection');
       }
     },
-    [validateConnection, setEdges, addWorkflowEdge]
+    [validateConnection, addWorkflowEdge]
   );
 
   const onInit = (instance: ReactFlowInstance) => {
@@ -310,10 +290,9 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
         },
       };
 
-      setNodes((nds) => nds.concat(newNode));
       addNode(newNode);
     },
-    [reactFlowInstance, setNodes, addNode]
+    [reactFlowInstance, addNode]
   );
 
   const onDragStart = (event: React.DragEvent, nodeType: string) => {
@@ -418,8 +397,6 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
         };
 
         setCurrentWorkflow(importedWorkflow);
-        setNodes(importedWorkflow.nodes || []);
-        setEdges(importedWorkflow.edges || []);
 
         toast.success('Workflow imported successfully!');
       } catch (error) {
@@ -434,8 +411,6 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
   const handleNewWorkflow = () => {
     const newWorkflow = createWorkflow('New Workflow', 'A new automation workflow');
     setCurrentWorkflow(newWorkflow);
-    setNodes([]);
-    setEdges([]);
     toast.success('New workflow created!');
   };
 
@@ -474,10 +449,8 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
       case 'delete':
         if (contextMenu?.nodeId) {
           deleteNode(id);
-          setNodes((nds) => nds.filter((node) => node.id !== id));
         } else if (contextMenu?.edgeId) {
           deleteEdge(id);
-          setEdges((eds) => eds.filter((edge) => edge.id !== id));
         }
         break;
       case 'duplicate':
@@ -529,14 +502,13 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
       if (event.key === 'Delete' || event.key === 'Backspace') {
         if (selectedNodeId) {
           deleteNode(selectedNodeId);
-          setNodes((nds) => nds.filter((node) => node.id !== selectedNodeId));
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedNodeId, handleSave, handleRun, undo, redo, deleteNode, setNodes]);
+  }, [selectedNodeId, handleSave, handleRun, undo, redo, deleteNode]);
 
   const groupedTemplates = nodeTemplates.reduce((acc, template) => {
     if (!acc[template.category]) {
@@ -748,8 +720,8 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
           <ReactFlow
             nodes={nodes}
             edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
+            onNodesChange={onNodesChangeRF}
+            onEdgesChange={onEdgesChangeRF}
             onConnect={onConnect}
             onInit={onInit}
             onDrop={onDrop}
@@ -824,7 +796,6 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
             onUpdate={(updates) => updateNode(selectedNode.id, updates)}
             onDelete={() => {
               deleteNode(selectedNode.id);
-              setNodes((nds) => nds.filter((node) => node.id !== selectedNode.id));
               setSelectedNode(null);
             }}
             onDuplicate={() => duplicateNode(selectedNode.id)}

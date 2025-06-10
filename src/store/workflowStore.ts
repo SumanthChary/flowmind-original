@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Node, Edge, Connection } from 'reactflow';
+import { Node, Edge, Connection, applyNodeChanges, applyEdgeChanges, NodeChange, EdgeChange } from 'reactflow';
 import toast from 'react-hot-toast';
 
 export interface WorkflowNode extends Node {
@@ -72,6 +72,10 @@ interface WorkflowState {
   deleteWorkflow: (id: string) => void;
   saveWorkflow: (workflow: Workflow) => void;
   loadWorkflow: (id: string) => Workflow | null;
+  
+  // ReactFlow integration
+  onNodesChangeRF: (changes: NodeChange[]) => void;
+  onEdgesChangeRF: (changes: EdgeChange[]) => void;
   
   // Node management
   addNode: (node: WorkflowNode) => void;
@@ -202,6 +206,34 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       console.error('Load error:', error);
     }
     return null;
+  },
+
+  onNodesChangeRF: (changes) => {
+    set((state) => {
+      if (!state.currentWorkflow) return state;
+      
+      const updatedNodes = applyNodeChanges(changes, state.currentWorkflow.nodes);
+      return {
+        currentWorkflow: {
+          ...state.currentWorkflow,
+          nodes: updatedNodes,
+        },
+      };
+    });
+  },
+
+  onEdgesChangeRF: (changes) => {
+    set((state) => {
+      if (!state.currentWorkflow) return state;
+      
+      const updatedEdges = applyEdgeChanges(changes, state.currentWorkflow.edges);
+      return {
+        currentWorkflow: {
+          ...state.currentWorkflow,
+          edges: updatedEdges,
+        },
+      };
+    });
   },
 
   addNode: (node) => {
