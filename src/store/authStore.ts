@@ -56,10 +56,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         .limit(0);
 
       if (error) {
-        // Check for table not found errors
+        // Check for table not found errors - be more comprehensive
         if (error.code === '42P01' || 
-            error.message?.includes('does not exist') || 
-            error.message?.includes('relation')) {
+            error.code === 'PGRST116' ||
+            error.message?.toLowerCase().includes('does not exist') || 
+            error.message?.toLowerCase().includes('relation') ||
+            error.message?.toLowerCase().includes('not found')) {
           set({ profilesTableExists: false });
           return false;
         }
@@ -74,8 +76,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ profilesTableExists: true });
       return true;
     } catch (error: any) {
-      // Handle any unexpected errors
+      // Handle any unexpected errors more comprehensively
       console.warn('Profiles table existence check failed:', error);
+      
+      // Check if it's a table not found error in the catch block too
+      if (error?.code === '42P01' || 
+          error?.code === 'PGRST116' ||
+          error?.message?.toLowerCase().includes('does not exist') || 
+          error?.message?.toLowerCase().includes('relation') ||
+          error?.message?.toLowerCase().includes('not found')) {
+        set({ profilesTableExists: false });
+        return false;
+      }
+      
+      // For any other error, assume table doesn't exist to be safe
       set({ profilesTableExists: false });
       return false;
     }
@@ -110,7 +124,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (error) {
         // If we get a table not found error here, update our cache
-        if (error.code === '42P01' || error.message?.includes('does not exist')) {
+        if (error.code === '42P01' || 
+            error.code === 'PGRST116' ||
+            error.message?.toLowerCase().includes('does not exist') ||
+            error.message?.toLowerCase().includes('relation')) {
           set({ profilesTableExists: false });
           // Create temporary profile
           const tempProfile: Profile = {
@@ -150,7 +167,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           set({ profile: newProfile });
         } catch (insertError: any) {
           // If insert fails due to table not existing, create temp profile
-          if (insertError.code === '42P01' || insertError.message?.includes('does not exist')) {
+          if (insertError.code === '42P01' || 
+              insertError.code === 'PGRST116' ||
+              insertError.message?.toLowerCase().includes('does not exist') ||
+              insertError.message?.toLowerCase().includes('relation')) {
             set({ profilesTableExists: false });
             const tempProfile: Profile = {
               id: user.id,
@@ -175,7 +195,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ profile: tempProfile });
       
       // Only log non-table-existence errors
-      if (!(error?.code === '42P01' || error?.message?.includes('does not exist'))) {
+      if (!(error?.code === '42P01' || 
+            error?.code === 'PGRST116' ||
+            error?.message?.toLowerCase().includes('does not exist') ||
+            error?.message?.toLowerCase().includes('relation'))) {
         console.error('Error in fetchProfile:', error);
       }
     }
@@ -227,7 +250,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (error) {
         // Check if table was deleted after our check
-        if (error.code === '42P01' || error.message?.includes('does not exist')) {
+        if (error.code === '42P01' || 
+            error.code === 'PGRST116' ||
+            error.message?.toLowerCase().includes('does not exist') ||
+            error.message?.toLowerCase().includes('relation')) {
           set({ profilesTableExists: false });
           if (!sessionStorage.getItem('migration-notice-shown')) {
             toast('Profile updated locally. Database migration required for persistence.', {
@@ -252,7 +278,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ profile });
       
       // Only show error for non-table-existence errors
-      if (!(error?.code === '42P01' || error?.message?.includes('does not exist'))) {
+      if (!(error?.code === '42P01' || 
+            error?.code === 'PGRST116' ||
+            error?.message?.toLowerCase().includes('does not exist') ||
+            error?.message?.toLowerCase().includes('relation'))) {
         console.error('Error updating profile:', error);
         throw error;
       }
