@@ -42,13 +42,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   checkProfilesTable: async () => {
     try {
       // Try a simple query to check if the table exists
-      const { error } = await supabase
+      // Use a more specific query that's less likely to cause console errors
+      const { data, error } = await supabase
         .from('profiles')
         .select('id')
-        .limit(1);
+        .limit(1)
+        .maybeSingle();
 
       if (error) {
-        if (error.code === '42P01' || error.message?.includes('does not exist')) {
+        // Check for table not found errors specifically
+        if (error.code === '42P01' || 
+            error.message?.includes('does not exist') || 
+            error.message?.includes('relation') ||
+            error.details?.includes('does not exist')) {
           set({ profilesTableExists: false });
           return false;
         }
@@ -59,10 +65,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       
       set({ profilesTableExists: true });
       return true;
-    } catch (error) {
-      console.error('Error checking profiles table:', error);
-      set({ profilesTableExists: false });
-      return false;
+    } catch (error: any) {
+      // Handle network or other unexpected errors
+      if (error?.code === '42P01' || 
+          error?.message?.includes('does not exist') ||
+          error?.message?.includes('relation')) {
+        set({ profilesTableExists: false });
+        return false;
+      }
+      
+      // For other errors, assume table exists to avoid blocking functionality
+      console.warn('Unable to verify profiles table existence:', error);
+      set({ profilesTableExists: true });
+      return true;
     }
   },
   
@@ -75,7 +90,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const tableExists = await get().checkProfilesTable();
       
       if (!tableExists) {
-        console.warn('Profiles table does not exist. Using user metadata for temporary profile.');
+        // Silently create temporary profile without logging warnings
         const tempProfile: Profile = {
           id: user.id,
           full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || '',
@@ -94,6 +109,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         .maybeSingle();
 
       if (error) {
+        // Check if this is a table not found error that slipped through
+        if (error.code === '42P01' || error.message?.includes('does not exist')) {
+          set({ profilesTableExists: false });
+          const tempProfile: Profile = {
+            id: user.id,
+            full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || '',
+            avatar_url: user.user_metadata?.avatar_url || null,
+            updated_at: new Date().toISOString()
+          };
+          set({ profile: tempProfile });
+          return;
+        }
+        
         console.error('Error fetching profile:', error);
         throw error;
       }
@@ -121,9 +149,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           set({ profile: newProfile });
         }
       }
-    } catch (error) {
-      console.error('Error in fetchProfile:', error);
-      // Create fallback profile from user data
+    } catch (error: any) {
+      // Create fallback profile from user data for any error
       const tempProfile: Profile = {
         id: user.id,
         full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || '',
@@ -131,6 +158,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         updated_at: new Date().toISOString()
       };
       set({ profile: tempProfile });
+      
+      // Only log non-table-existence errors
+      if (!(error?.code === '42P01' || error?.message?.includes('does not exist'))) {
+        console.error('Error in fetchProfile:', error);
+      }
     }
   },
   
@@ -144,8 +176,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     // If profiles table doesn't exist, just keep the local update
     if (!profilesTableExists) {
-      console.warn('Profiles table does not exist. Keeping local profile changes only.');
-      toast.success('Profile updated locally. Database migration required for persistence.');
+      // Show a subtle notification only once per session
+      if (!sessionStorage.getItem('migration-notice-shown')) {
+        toast('Profile updated locally. Run database migration for persistence.', {
+          icon: 'ℹ️',
+          duration: 4000,
+        });
+        sessionStorage.setItem('migration-notice-shown', 'true');
+      }
       return;
     }
 
@@ -158,9 +196,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (error) {
         // Check if table was deleted after our initial check
         if (error.code === '42P01' || error.message?.includes('does not exist')) {
-          console.warn('Profiles table no longer exists. Keeping local changes.');
           set({ profilesTableExists: false });
-          toast.success('Profile updated locally. Database migration required for persistence.');
+          if (!sessionStorage.getItem('migration-notice-shown')) {
+            toast('Profile updated locally. Database migration required for persistence.', {
+              icon: 'ℹ️',
+              duration: 4000,
+            });
+            sessionStorage.setItem('migration-notice-shown', 'true');
+          }
           return;
         }
         // Revert optimistic update on other errors
@@ -172,11 +215,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await get().fetchProfile();
       toast.success('Profile updated successfully!');
       
-    } catch (error) {
-      console.error('Error updating profile:', error);
+    } catch (error: any) {
       // Revert optimistic update on error
       set({ profile });
-      toast.error('Failed to update profile. Please try again.');
+      
+      // Only show error toast for non-table-existence errors
+      if (!(error?.code === '42P01' || error?.message?.includes('does not exist'))) {
+        console.error('Error updating profile:', error);
+        toast.error('Failed to update profile. Please try again.');
+      }
       throw error;
     }
   },
@@ -186,6 +233,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       set({ user: null, profile: null, profilesTableExists: false });
+      // Clear session storage on sign out
+      sessionStorage.removeItem('migration-notice-shown');
     } catch (error) {
       console.error('Error signing out:', error);
       throw error;
@@ -214,7 +263,9 @@ const initializeAuth = async () => {
     // Fetch profile if user exists (non-blocking)
     if (session?.user) {
       // Don't await to make initialization faster
-      store.fetchProfile().catch(console.error);
+      store.fetchProfile().catch(() => {
+        // Silently handle errors during initialization
+      });
     }
   } catch (error) {
     console.error('Error initializing auth:', error);
@@ -240,11 +291,14 @@ supabase.auth.onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_IN' && session?.user) {
       store.setUser(session.user);
       // Fetch profile asynchronously for better performance
-      store.fetchProfile().catch(console.error);
+      store.fetchProfile().catch(() => {
+        // Silently handle errors during auth state changes
+      });
     } else if (event === 'SIGNED_OUT') {
       store.setUser(null);
       store.setProfile(null);
       store.setProfilesTableExists(false);
+      sessionStorage.removeItem('migration-notice-shown');
     }
   }, 100); // 100ms debounce
 });
