@@ -125,7 +125,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           console.warn('Profiles table does not exist. Keeping local changes.');
           return;
         }
-        // Revert on other errors
+        // Revert optimistic update on error
         set({ profile });
         throw error;
       }
@@ -153,20 +153,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 }));
 
-// Initialize auth state
+// Initialize auth state with performance optimization
 const initializeAuth = async () => {
   const store = useAuthStore.getState();
   
   try {
     store.setLoading(true);
-    const { data: { session } } = await supabase.auth.getSession();
+    
+    // Use cached session if available
+    const { data: { session }, error } = await supabase.auth.getSession();
+    
+    if (error) {
+      console.error('Auth initialization error:', error);
+      return;
+    }
     
     store.setUser(session?.user ?? null);
     store.setInitialized(true);
     
-    // Fetch profile if user exists
+    // Fetch profile if user exists (non-blocking)
     if (session?.user) {
-      await store.fetchProfile();
+      // Don't await to make initialization faster
+      store.fetchProfile().catch(console.error);
     }
   } catch (error) {
     console.error('Error initializing auth:', error);
@@ -178,15 +186,24 @@ const initializeAuth = async () => {
 // Initialize immediately
 initializeAuth();
 
-// Listen for auth changes
+// Listen for auth changes with debouncing
+let authChangeTimeout: NodeJS.Timeout;
 supabase.auth.onAuthStateChange(async (event, session) => {
   const store = useAuthStore.getState();
   
-  if (event === 'SIGNED_IN' && session?.user) {
-    store.setUser(session.user);
-    await store.fetchProfile();
-  } else if (event === 'SIGNED_OUT') {
-    store.setUser(null);
-    store.setProfile(null);
+  // Clear previous timeout to debounce rapid auth changes
+  if (authChangeTimeout) {
+    clearTimeout(authChangeTimeout);
   }
+  
+  authChangeTimeout = setTimeout(async () => {
+    if (event === 'SIGNED_IN' && session?.user) {
+      store.setUser(session.user);
+      // Fetch profile asynchronously for better performance
+      store.fetchProfile().catch(console.error);
+    } else if (event === 'SIGNED_OUT') {
+      store.setUser(null);
+      store.setProfile(null);
+    }
+  }, 100); // 100ms debounce
 });

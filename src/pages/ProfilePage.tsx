@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Mail, LogOut, Camera, Save, Calendar, Shield, Activity, ArrowLeft, Upload, X } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
@@ -27,22 +27,41 @@ const ProfilePage = () => {
     }
   }, [profile]);
 
-  const displayName = profile?.full_name || user?.email?.split('@')[0] || 'User';
-  const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-  const joinDate = user?.created_at ? new Date(user.created_at).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  }) : 'Unknown';
+  // Memoize expensive calculations
+  const profileStats = useMemo(() => {
+    const activeWorkflows = workflows.filter(w => w.status === 'active').length;
+    const totalExecutions = executionLogs.length;
+    const successfulExecutions = executionLogs.filter(log => log.status === 'success').length;
+    const timeSavedMinutes = successfulExecutions * 5; // Estimate 5 minutes per successful execution
+    const timeSavedHours = Math.round(timeSavedMinutes / 60 * 10) / 10;
 
-  // Calculate real stats
-  const activeWorkflows = workflows.filter(w => w.status === 'active').length;
-  const totalExecutions = executionLogs.length;
-  const successfulExecutions = executionLogs.filter(log => log.status === 'success').length;
-  const timeSavedMinutes = successfulExecutions * 5; // Estimate 5 minutes per successful execution
-  const timeSavedHours = Math.round(timeSavedMinutes / 60 * 10) / 10;
+    return {
+      activeWorkflows,
+      totalExecutions,
+      timeSavedHours
+    };
+  }, [workflows, executionLogs]);
 
-  const handleUpdateProfile = async (e: React.FormEvent) => {
+  const displayName = useMemo(() => 
+    profile?.full_name || user?.email?.split('@')[0] || 'User',
+    [profile?.full_name, user?.email]
+  );
+
+  const initials = useMemo(() => 
+    displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2),
+    [displayName]
+  );
+
+  const joinDate = useMemo(() => 
+    user?.created_at ? new Date(user.created_at).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    }) : 'Unknown',
+    [user?.created_at]
+  );
+
+  const handleUpdateProfile = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName.trim()) {
       toast.error('Please enter a valid name');
@@ -63,13 +82,13 @@ const ProfilePage = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [fullName, avatarUrl, updateProfile]);
 
-  const handleAvatarClick = () => {
+  const handleAvatarClick = useCallback(() => {
     fileInputRef.current?.click();
-  };
+  }, []);
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -102,14 +121,14 @@ const ProfilePage = () => {
     } finally {
       setIsUploadingAvatar(false);
     }
-  };
+  }, []);
 
-  const handleRemoveAvatar = () => {
+  const handleRemoveAvatar = useCallback(() => {
     setAvatarUrl('');
     toast.success('Avatar removed. Click Save to update your profile.');
-  };
+  }, []);
 
-  const handleSignOut = async () => {
+  const handleSignOut = useCallback(async () => {
     try {
       await signOut();
       toast.success('Signed out successfully');
@@ -118,7 +137,294 @@ const ProfilePage = () => {
       toast.error('Error signing out');
       console.error('Error signing out:', error);
     }
-  };
+  }, [signOut, navigate]);
+
+  // Memoized components
+  const ProfileCard = useMemo(() => (
+    <motion.div 
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.3, delay: 0.1 }}
+      className="lg:col-span-1"
+    >
+      <div className="bg-white rounded-xl shadow-soft p-6">
+        <div className="text-center">
+          <div className="relative inline-block mb-4">
+            {avatarUrl ? (
+              <img 
+                src={avatarUrl} 
+                alt={displayName} 
+                className="w-24 h-24 rounded-full object-cover mx-auto"
+              />
+            ) : (
+              <div className="w-24 h-24 bg-gradient-to-br from-accent-400 to-accent-600 rounded-full flex items-center justify-center mx-auto">
+                <span className="text-2xl font-bold text-white">
+                  {initials}
+                </span>
+              </div>
+            )}
+            
+            {/* Avatar Actions */}
+            <div className="absolute bottom-0 right-0 flex space-x-1">
+              <button
+                onClick={handleAvatarClick}
+                disabled={isUploadingAvatar}
+                className="bg-white rounded-full p-2 shadow-medium hover:shadow-lg transition-shadow disabled:opacity-50"
+                title="Upload new avatar"
+              >
+                {isUploadingAvatar ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-accent-600"></div>
+                ) : (
+                  <Camera size={16} className="text-gray-600" />
+                )}
+              </button>
+              
+              {avatarUrl && (
+                <button
+                  onClick={handleRemoveAvatar}
+                  className="bg-white rounded-full p-2 shadow-medium hover:shadow-lg transition-shadow text-error-600"
+                  title="Remove avatar"
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+            
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+          </div>
+          
+          <h2 className="text-xl font-bold text-gray-900 mb-1">
+            {displayName}
+          </h2>
+          <p className="text-gray-600 mb-4">{user?.email}</p>
+          
+          <button
+            onClick={handleSignOut}
+            className="w-full flex items-center justify-center px-4 py-2 text-sm font-medium text-error-600 bg-error-50 hover:bg-error-100 rounded-lg transition-colors"
+          >
+            <LogOut size={16} className="mr-2" />
+            Sign Out
+          </button>
+        </div>
+      </div>
+      
+      {/* Quick Stats */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.2 }}
+        className="mt-6 bg-white rounded-xl shadow-soft p-6"
+      >
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Account Stats</h3>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <Activity size={16} className="text-accent-600 mr-2" />
+              <span className="text-sm text-gray-600">Workflows</span>
+            </div>
+            <span className="font-medium">{profileStats.activeWorkflows}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <Shield size={16} className="text-success-600 mr-2" />
+              <span className="text-sm text-gray-600">Tasks Automated</span>
+            </div>
+            <span className="font-medium">{profileStats.totalExecutions.toLocaleString()}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <Calendar size={16} className="text-primary-600 mr-2" />
+              <span className="text-sm text-gray-600">Time Saved</span>
+            </div>
+            <span className="font-medium">{profileStats.timeSavedHours}h</span>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  ), [displayName, initials, avatarUrl, user?.email, handleAvatarClick, isUploadingAvatar, handleRemoveAvatar, handleSignOut, profileStats]);
+
+  const ProfileForm = useMemo(() => (
+    <motion.div
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.3, delay: 0.1 }}
+      className="bg-white rounded-xl shadow-soft p-6"
+    >
+      <h3 className="text-lg font-semibold text-gray-900 mb-6">Profile Settings</h3>
+      
+      <form onSubmit={handleUpdateProfile} className="space-y-6">
+        <div>
+          <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-2">
+            Full Name
+          </label>
+          <div className="relative">
+            <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              id="fullName"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              className="pl-10 w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-all"
+              placeholder="Enter your full name"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+            Email Address
+          </label>
+          <div className="relative">
+            <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="email"
+              id="email"
+              value={user?.email || ''}
+              disabled
+              className="pl-10 w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
+            />
+          </div>
+          <p className="mt-2 text-sm text-gray-500">
+            Email cannot be changed for security reasons
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Profile Picture
+          </label>
+          <div className="flex items-center space-x-4">
+            <div className="relative">
+              {avatarUrl ? (
+                <img 
+                  src={avatarUrl} 
+                  alt="Profile preview" 
+                  className="w-16 h-16 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-16 h-16 bg-gradient-to-br from-accent-400 to-accent-600 rounded-full flex items-center justify-center">
+                  <span className="text-lg font-bold text-white">
+                    {initials}
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className="flex space-x-2">
+              <button
+                type="button"
+                onClick={handleAvatarClick}
+                disabled={isUploadingAvatar}
+                className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                <Upload size={16} className="mr-2" />
+                {isUploadingAvatar ? 'Uploading...' : 'Upload'}
+              </button>
+              {avatarUrl && (
+                <button
+                  type="button"
+                  onClick={handleRemoveAvatar}
+                  className="flex items-center px-3 py-2 text-sm font-medium text-error-600 bg-error-50 border border-error-200 rounded-lg hover:bg-error-100 transition-colors"
+                >
+                  <X size={16} className="mr-2" />
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
+          <p className="mt-2 text-sm text-gray-500">
+            Recommended: Square image, at least 200x200px, max 5MB
+          </p>
+        </div>
+
+        <div className="flex justify-end">
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="flex items-center bg-accent-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-accent-700 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:ring-offset-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLoading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save size={16} className="mr-2" />
+                Save Changes
+              </>
+            )}
+          </button>
+        </div>
+      </form>
+    </motion.div>
+  ), [fullName, user?.email, avatarUrl, initials, handleUpdateProfile, handleAvatarClick, isUploadingAvatar, handleRemoveAvatar, isLoading]);
+
+  const AccountInfo = useMemo(() => (
+    <motion.div
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.3, delay: 0.2 }}
+      className="bg-white rounded-xl shadow-soft p-6"
+    >
+      <h3 className="text-lg font-semibold text-gray-900 mb-6">Account Information</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-gray-50 rounded-lg p-4">
+          <div className="flex items-center mb-2">
+            <Calendar size={16} className="text-primary-600 mr-2" />
+            <span className="text-sm font-medium text-gray-900">Member Since</span>
+          </div>
+          <p className="text-lg font-semibold text-gray-900">{joinDate}</p>
+        </div>
+        
+        <div className="bg-gray-50 rounded-lg p-4">
+          <div className="flex items-center mb-2">
+            <Activity size={16} className="text-accent-600 mr-2" />
+            <span className="text-sm font-medium text-gray-900">Account Status</span>
+          </div>
+          <p className="text-lg font-semibold text-success-600">Active</p>
+        </div>
+      </div>
+    </motion.div>
+  ), [joinDate]);
+
+  const SecuritySettings = useMemo(() => (
+    <motion.div
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.3, delay: 0.3 }}
+      className="bg-white rounded-xl shadow-soft p-6"
+    >
+      <h3 className="text-lg font-semibold text-gray-900 mb-6">Security & Privacy</h3>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+          <div>
+            <h4 className="font-medium text-gray-900">Two-Factor Authentication</h4>
+            <p className="text-sm text-gray-600">Add an extra layer of security to your account</p>
+          </div>
+          <button className="bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">
+            Enable
+          </button>
+        </div>
+        
+        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+          <div>
+            <h4 className="font-medium text-gray-900">Login Notifications</h4>
+            <p className="text-sm text-gray-600">Get notified when someone logs into your account</p>
+          </div>
+          <button className="bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">
+            Configure
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  ), []);
 
   return (
     <div className="min-h-screen bg-gray-50 pt-20">
@@ -143,288 +449,18 @@ const ProfilePage = () => {
             className="grid grid-cols-1 lg:grid-cols-3 gap-8"
           >
             {/* Profile Card */}
-            <motion.div 
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3, delay: 0.1 }}
-              className="lg:col-span-1"
-            >
-              <div className="bg-white rounded-xl shadow-soft p-6">
-                <div className="text-center">
-                  <div className="relative inline-block mb-4">
-                    {avatarUrl ? (
-                      <img 
-                        src={avatarUrl} 
-                        alt={displayName} 
-                        className="w-24 h-24 rounded-full object-cover mx-auto"
-                      />
-                    ) : (
-                      <div className="w-24 h-24 bg-gradient-to-br from-accent-400 to-accent-600 rounded-full flex items-center justify-center mx-auto">
-                        <span className="text-2xl font-bold text-white">
-                          {initials}
-                        </span>
-                      </div>
-                    )}
-                    
-                    {/* Avatar Actions */}
-                    <div className="absolute bottom-0 right-0 flex space-x-1">
-                      <button
-                        onClick={handleAvatarClick}
-                        disabled={isUploadingAvatar}
-                        className="bg-white rounded-full p-2 shadow-medium hover:shadow-lg transition-shadow disabled:opacity-50"
-                        title="Upload new avatar"
-                      >
-                        {isUploadingAvatar ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-accent-600"></div>
-                        ) : (
-                          <Camera size={16} className="text-gray-600" />
-                        )}
-                      </button>
-                      
-                      {avatarUrl && (
-                        <button
-                          onClick={handleRemoveAvatar}
-                          className="bg-white rounded-full p-2 shadow-medium hover:shadow-lg transition-shadow text-error-600"
-                          title="Remove avatar"
-                        >
-                          <X size={16} />
-                        </button>
-                      )}
-                    </div>
-                    
-                    {/* Hidden file input */}
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFileChange}
-                      className="hidden"
-                    />
-                  </div>
-                  
-                  <h2 className="text-xl font-bold text-gray-900 mb-1">
-                    {displayName}
-                  </h2>
-                  <p className="text-gray-600 mb-4">{user?.email}</p>
-                  
-                  <button
-                    onClick={handleSignOut}
-                    className="w-full flex items-center justify-center px-4 py-2 text-sm font-medium text-error-600 bg-error-50 hover:bg-error-100 rounded-lg transition-colors"
-                  >
-                    <LogOut size={16} className="mr-2" />
-                    Sign Out
-                  </button>
-                </div>
-              </div>
-              
-              {/* Quick Stats */}
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.2 }}
-                className="mt-6 bg-white rounded-xl shadow-soft p-6"
-              >
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Account Stats</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <Activity size={16} className="text-accent-600 mr-2" />
-                      <span className="text-sm text-gray-600">Workflows</span>
-                    </div>
-                    <span className="font-medium">{activeWorkflows}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <Shield size={16} className="text-success-600 mr-2" />
-                      <span className="text-sm text-gray-600">Tasks Automated</span>
-                    </div>
-                    <span className="font-medium">{totalExecutions.toLocaleString()}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <Calendar size={16} className="text-primary-600 mr-2" />
-                      <span className="text-sm text-gray-600">Time Saved</span>
-                    </div>
-                    <span className="font-medium">{timeSavedHours}h</span>
-                  </div>
-                </div>
-              </motion.div>
-            </motion.div>
+            {ProfileCard}
 
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-6">
               {/* Profile Settings */}
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.3, delay: 0.1 }}
-                className="bg-white rounded-xl shadow-soft p-6"
-              >
-                <h3 className="text-lg font-semibold text-gray-900 mb-6">Profile Settings</h3>
-                
-                <form onSubmit={handleUpdateProfile} className="space-y-6">
-                  <div>
-                    <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-2">
-                      Full Name
-                    </label>
-                    <div className="relative">
-                      <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                      <input
-                        type="text"
-                        id="fullName"
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        className="pl-10 w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-all"
-                        placeholder="Enter your full name"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                      Email Address
-                    </label>
-                    <div className="relative">
-                      <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                      <input
-                        type="email"
-                        id="email"
-                        value={user?.email || ''}
-                        disabled
-                        className="pl-10 w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
-                      />
-                    </div>
-                    <p className="mt-2 text-sm text-gray-500">
-                      Email cannot be changed for security reasons
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Profile Picture
-                    </label>
-                    <div className="flex items-center space-x-4">
-                      <div className="relative">
-                        {avatarUrl ? (
-                          <img 
-                            src={avatarUrl} 
-                            alt="Profile preview" 
-                            className="w-16 h-16 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-16 h-16 bg-gradient-to-br from-accent-400 to-accent-600 rounded-full flex items-center justify-center">
-                            <span className="text-lg font-bold text-white">
-                              {initials}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex space-x-2">
-                        <button
-                          type="button"
-                          onClick={handleAvatarClick}
-                          disabled={isUploadingAvatar}
-                          className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-                        >
-                          <Upload size={16} className="mr-2" />
-                          {isUploadingAvatar ? 'Uploading...' : 'Upload'}
-                        </button>
-                        {avatarUrl && (
-                          <button
-                            type="button"
-                            onClick={handleRemoveAvatar}
-                            className="flex items-center px-3 py-2 text-sm font-medium text-error-600 bg-error-50 border border-error-200 rounded-lg hover:bg-error-100 transition-colors"
-                          >
-                            <X size={16} className="mr-2" />
-                            Remove
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    <p className="mt-2 text-sm text-gray-500">
-                      Recommended: Square image, at least 200x200px, max 5MB
-                    </p>
-                  </div>
-
-                  <div className="flex justify-end">
-                    <button
-                      type="submit"
-                      disabled={isLoading}
-                      className="flex items-center bg-accent-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-accent-700 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:ring-offset-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isLoading ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <Save size={16} className="mr-2" />
-                          Save Changes
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
-              </motion.div>
+              {ProfileForm}
 
               {/* Account Information */}
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.3, delay: 0.2 }}
-                className="bg-white rounded-xl shadow-soft p-6"
-              >
-                <h3 className="text-lg font-semibold text-gray-900 mb-6">Account Information</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="flex items-center mb-2">
-                      <Calendar size={16} className="text-primary-600 mr-2" />
-                      <span className="text-sm font-medium text-gray-900">Member Since</span>
-                    </div>
-                    <p className="text-lg font-semibold text-gray-900">{joinDate}</p>
-                  </div>
-                  
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="flex items-center mb-2">
-                      <Activity size={16} className="text-accent-600 mr-2" />
-                      <span className="text-sm font-medium text-gray-900">Account Status</span>
-                    </div>
-                    <p className="text-lg font-semibold text-success-600">Active</p>
-                  </div>
-                </div>
-              </motion.div>
+              {AccountInfo}
 
               {/* Security Settings */}
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.3, delay: 0.3 }}
-                className="bg-white rounded-xl shadow-soft p-6"
-              >
-                <h3 className="text-lg font-semibold text-gray-900 mb-6">Security & Privacy</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div>
-                      <h4 className="font-medium text-gray-900">Two-Factor Authentication</h4>
-                      <p className="text-sm text-gray-600">Add an extra layer of security to your account</p>
-                    </div>
-                    <button className="bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">
-                      Enable
-                    </button>
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div>
-                      <h4 className="font-medium text-gray-900">Login Notifications</h4>
-                      <p className="text-sm text-gray-600">Get notified when someone logs into your account</p>
-                    </div>
-                    <button className="bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">
-                      Configure
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
+              {SecuritySettings}
             </div>
           </motion.div>
         </div>
