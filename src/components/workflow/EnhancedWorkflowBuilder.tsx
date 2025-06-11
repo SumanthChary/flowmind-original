@@ -484,16 +484,14 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
         nodes: flow.nodes,
         edges: flow.edges,
         viewport: flow.viewport,
-        updatedAt: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       };
 
-      saveWorkflow(updatedWorkflow);
+      await saveWorkflow(updatedWorkflow);
       if (onSave) {
         onSave(updatedWorkflow);
       }
-      toast.success('Workflow saved successfully!');
     } catch (error) {
-      toast.error('Failed to save workflow');
       console.error('Save error:', error);
     } finally {
       setIsSaving(false);
@@ -587,8 +585,8 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
           ...importData.workflow,
           id: `imported-${Date.now()}`,
           name: `${importData.workflow.name} (Imported)`,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         };
 
         setCurrentWorkflow(importedWorkflow);

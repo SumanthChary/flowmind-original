@@ -19,20 +19,38 @@ import {
   MoreVertical,
   Workflow,
   AlertCircle,
-  Activity
+  Activity,
+  Edit,
+  Trash2,
+  Copy
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useWorkflowStore } from '../store/workflowStore';
 import { motion } from 'framer-motion';
+import toast from 'react-hot-toast';
 
 const DashboardPage = () => {
   const { user, profile } = useAuthStore();
-  const { workflows, executionLogs } = useWorkflowStore();
+  const { workflows, executionLogs, loadAllWorkflows, deleteWorkflow } = useWorkflowStore();
   const [activeTab, setActiveTab] = useState('overview');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     document.title = "Dashboard | FlowMind";
   }, []);
+
+  // Load workflows when component mounts
+  useEffect(() => {
+    const loadWorkflows = async () => {
+      setLoading(true);
+      await loadAllWorkflows();
+      setLoading(false);
+    };
+    
+    if (user) {
+      loadWorkflows();
+    }
+  }, [user, loadAllWorkflows]);
 
   // Memoize expensive calculations
   const dashboardData = useMemo(() => {
@@ -103,8 +121,8 @@ const DashboardPage = () => {
   // Memoize recent workflows with real data
   const recentWorkflows = useMemo(() => 
     workflows
-      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-      .slice(0, 4)
+      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+      .slice(0, 6)
       .map(workflow => {
         const workflowLogs = executionLogs.filter(log => log.workflowId === workflow.id);
         const lastExecution = workflowLogs[0];
@@ -118,7 +136,9 @@ const DashboardPage = () => {
           status: workflow.status,
           executions: workflowLogs.length,
           lastRun: lastExecution ? new Date(lastExecution.timestamp).toLocaleString() : 'Never',
-          success: workflowSuccessRate
+          success: workflowSuccessRate,
+          updated_at: workflow.updated_at,
+          size: workflow.size || 0
         };
       }),
     [workflows, executionLogs]
@@ -145,6 +165,41 @@ const DashboardPage = () => {
       }),
     [executionLogs, workflows]
   );
+
+  const handleDeleteWorkflow = async (workflowId: string, workflowName: string) => {
+    if (confirm(`Are you sure you want to delete "${workflowName}"? This action cannot be undone.`)) {
+      try {
+        await deleteWorkflow(workflowId);
+      } catch (error) {
+        console.error('Failed to delete workflow:', error);
+      }
+    }
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) {
+      return 'Today';
+    } else if (diffDays === 1) {
+      return 'Yesterday';
+    } else if (diffDays < 7) {
+      return `${diffDays} days ago`;
+    } else {
+      return date.toLocaleDateString();
+    }
+  };
 
   // Memoized components to prevent unnecessary re-renders
   const StatsGrid = useMemo(() => (
@@ -212,7 +267,15 @@ const DashboardPage = () => {
         </Link>
       </div>
       
-      {recentWorkflows.length === 0 ? (
+      {loading ? (
+        <div className="space-y-4">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="animate-pulse">
+              <div className="h-16 bg-gray-200 rounded-lg"></div>
+            </div>
+          ))}
+        </div>
+      ) : recentWorkflows.length === 0 ? (
         <div className="text-center py-8">
           <Workflow size={48} className="text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No workflows yet</h3>
@@ -258,6 +321,8 @@ const DashboardPage = () => {
                   <div className="flex items-center space-x-4 text-xs text-gray-500">
                     <span>{workflow.executions} executions</span>
                     <span>Last run: {workflow.lastRun}</span>
+                    <span>Updated: {formatDate(workflow.updated_at)}</span>
+                    <span>{formatFileSize(workflow.size)}</span>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -266,8 +331,14 @@ const DashboardPage = () => {
                     className="p-2 text-gray-400 hover:text-accent-600 hover:bg-accent-50 rounded-lg transition-colors"
                     title="Edit workflow"
                   >
-                    <Settings size={16} />
+                    <Edit size={16} />
                   </Link>
+                  <button 
+                    className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+                    title="Duplicate workflow"
+                  >
+                    <Copy size={16} />
+                  </button>
                   <button className={`p-2 rounded-lg transition-colors ${
                     workflow.status === 'active' 
                       ? 'text-warning-600 hover:bg-warning-50' 
@@ -275,9 +346,31 @@ const DashboardPage = () => {
                   }`}>
                     {workflow.status === 'active' ? <Pause size={16} /> : <Play size={16} />}
                   </button>
-                  <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
-                    <MoreVertical size={16} />
-                  </button>
+                  <div className="relative group">
+                    <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
+                      <MoreVertical size={16} />
+                    </button>
+                    <div className="absolute right-0 top-8 w-48 bg-white border border-gray-200 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                      <Link
+                        to={`/workflow-builder?id=${workflow.id}`}
+                        className="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        Edit Workflow
+                      </Link>
+                      <button
+                        className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        Duplicate
+                      </button>
+                      <hr className="my-1" />
+                      <button
+                        onClick={() => handleDeleteWorkflow(workflow.id, workflow.name)}
+                        className="block w-full text-left px-3 py-2 text-sm text-error-600 hover:bg-error-50 transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </motion.div>
@@ -285,7 +378,7 @@ const DashboardPage = () => {
         </div>
       )}
     </motion.div>
-  ), [recentWorkflows]);
+  ), [recentWorkflows, loading, handleDeleteWorkflow, formatDate, formatFileSize]);
 
   const PerformanceChart = useMemo(() => (
     <motion.div

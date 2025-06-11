@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Node, Edge, Connection, applyNodeChanges, applyEdgeChanges, NodeChange, EdgeChange } from 'reactflow';
-import { workflowService } from '../services/workflowService';
+import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 
 export interface WorkflowNode extends Node {
@@ -30,8 +30,9 @@ export interface Workflow {
   edges: WorkflowEdge[];
   viewport: any;
   settings: WorkflowSettings;
-  createdAt: string;
-  updatedAt: string;
+  created_at: string;
+  updated_at: string;
+  created_by?: string;
   lastExecuted?: string;
   status: 'draft' | 'active' | 'paused' | 'error';
   version?: number;
@@ -76,6 +77,7 @@ interface WorkflowState {
   deleteWorkflow: (id: string) => void;
   saveWorkflow: (workflow: Workflow) => Promise<void>;
   loadWorkflow: (id: string) => Promise<Workflow | null>;
+  loadAllWorkflows: () => Promise<void>;
   
   // ReactFlow integration
   onNodesChangeRF: (changes: NodeChange[]) => void;
@@ -133,6 +135,44 @@ const defaultSettings: WorkflowSettings = {
   notifyOnSuccess: false,
 };
 
+// Utility functions for data compression
+const compressWorkflowData = (workflow: Workflow): string => {
+  const essentialData = {
+    nodes: workflow.nodes.map(node => ({
+      id: node.id,
+      type: node.type,
+      position: node.position,
+      data: {
+        label: node.data.label,
+        type: node.data.type,
+        config: node.data.config,
+        active: node.data.active
+      }
+    })),
+    edges: workflow.edges.map(edge => ({
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      sourceHandle: edge.sourceHandle,
+      targetHandle: edge.targetHandle,
+      type: edge.type
+    })),
+    viewport: workflow.viewport,
+    settings: workflow.settings
+  };
+  
+  return JSON.stringify(essentialData);
+};
+
+const decompressWorkflowData = (compressed: string): { nodes: WorkflowNode[]; edges: WorkflowEdge[]; viewport: any; settings: WorkflowSettings } => {
+  try {
+    return JSON.parse(compressed);
+  } catch (error) {
+    console.error('Failed to decompress workflow data:', error);
+    return { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 }, settings: defaultSettings };
+  }
+};
+
 export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   workflows: [],
   currentWorkflow: null,
@@ -164,8 +204,8 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       edges: [],
       viewport: { x: 0, y: 0, zoom: 1 },
       settings: { ...defaultSettings },
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
       status: 'draft',
       version: 1,
       size: 0
@@ -184,53 +224,186 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   updateWorkflow: (id, updates) => {
     set((state) => ({
       workflows: state.workflows.map((w) =>
-        w.id === id ? { ...w, ...updates, updatedAt: new Date().toISOString() } : w
+        w.id === id ? { ...w, ...updates, updated_at: new Date().toISOString() } : w
       ),
       currentWorkflow:
         state.currentWorkflow?.id === id
-          ? { ...state.currentWorkflow, ...updates, updatedAt: new Date().toISOString() }
+          ? { ...state.currentWorkflow, ...updates, updated_at: new Date().toISOString() }
           : state.currentWorkflow,
     }));
   },
 
-  deleteWorkflow: (id) => {
-    set((state) => ({
-      workflows: state.workflows.filter((w) => w.id !== id),
-      currentWorkflow: state.currentWorkflow?.id === id ? null : state.currentWorkflow,
-    }));
+  deleteWorkflow: async (id) => {
+    try {
+      const { error } = await supabase
+        .from('workflows')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      set((state) => ({
+        workflows: state.workflows.filter((w) => w.id !== id),
+        currentWorkflow: state.currentWorkflow?.id === id ? null : state.currentWorkflow,
+      }));
+
+      toast.success('Workflow deleted successfully');
+    } catch (error) {
+      console.error('Delete error:', error);
+      toast.error('Failed to delete workflow');
+    }
   },
 
   saveWorkflow: async (workflow) => {
     try {
-      await workflowService.autoSave(workflow, { immediate: true });
-      
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      const compressedData = compressWorkflowData(workflow);
+      const size = new Blob([compressedData]).size;
+
+      const workflowData = {
+        id: workflow.id,
+        name: workflow.name,
+        description: workflow.description || '',
+        data: compressedData,
+        status: workflow.status,
+        size: size,
+        updated_at: new Date().toISOString(),
+        created_by: user.id
+      };
+
+      // Check if workflow exists
+      const { data: existingWorkflow } = await supabase
+        .from('workflows')
+        .select('id')
+        .eq('id', workflow.id)
+        .single();
+
+      let result;
+      if (existingWorkflow) {
+        // Update existing workflow
+        result = await supabase
+          .from('workflows')
+          .update(workflowData)
+          .eq('id', workflow.id)
+          .select()
+          .single();
+      } else {
+        // Insert new workflow
+        result = await supabase
+          .from('workflows')
+          .insert({
+            ...workflowData,
+            created_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+      }
+
+      if (result.error) throw result.error;
+
+      // Update local state
+      const savedWorkflow = {
+        ...workflow,
+        created_at: result.data.created_at,
+        updated_at: result.data.updated_at,
+        created_by: result.data.created_by,
+        size: result.data.size
+      };
+
       set((state) => ({
-        workflows: state.workflows.map((w) => (w.id === workflow.id ? workflow : w)),
-        currentWorkflow: state.currentWorkflow?.id === workflow.id ? workflow : state.currentWorkflow,
+        workflows: state.workflows.some(w => w.id === workflow.id)
+          ? state.workflows.map((w) => (w.id === workflow.id ? savedWorkflow : w))
+          : [...state.workflows, savedWorkflow],
+        currentWorkflow: state.currentWorkflow?.id === workflow.id ? savedWorkflow : state.currentWorkflow,
       }));
+
+      toast.success('Workflow saved successfully!');
     } catch (error) {
       console.error('Save error:', error);
+      toast.error('Failed to save workflow');
       throw error;
     }
   },
 
   loadWorkflow: async (id) => {
     try {
-      const workflow = await workflowService.load(id);
-      if (workflow) {
-        set((state) => ({
-          workflows: state.workflows.some((w) => w.id === id)
-            ? state.workflows.map((w) => (w.id === id ? workflow : w))
-            : [...state.workflows, workflow],
-          currentWorkflow: workflow,
-          history: [{ nodes: [...workflow.nodes], edges: [...workflow.edges] }],
-          historyIndex: 0,
-        }));
-      }
+      const { data, error } = await supabase
+        .from('workflows')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) throw error;
+      if (!data) return null;
+
+      const decompressed = decompressWorkflowData(data.data);
+      const workflow: Workflow = {
+        id: data.id,
+        name: data.name,
+        description: data.description,
+        nodes: decompressed.nodes,
+        edges: decompressed.edges,
+        viewport: decompressed.viewport,
+        settings: decompressed.settings,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+        created_by: data.created_by,
+        status: data.status,
+        size: data.size
+      };
+
+      set((state) => ({
+        workflows: state.workflows.some((w) => w.id === id)
+          ? state.workflows.map((w) => (w.id === id ? workflow : w))
+          : [...state.workflows, workflow],
+        currentWorkflow: workflow,
+        history: [{ nodes: [...workflow.nodes], edges: [...workflow.edges] }],
+        historyIndex: 0,
+      }));
+
       return workflow;
     } catch (error) {
       console.error('Load error:', error);
+      toast.error('Failed to load workflow');
       return null;
+    }
+  },
+
+  loadAllWorkflows: async () => {
+    try {
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('workflows')
+        .select('id, name, description, created_at, updated_at, status, size, created_by')
+        .eq('created_by', user.id)
+        .order('updated_at', { ascending: false });
+
+      if (error) throw error;
+
+      const workflows = data.map(item => ({
+        id: item.id,
+        name: item.name,
+        description: item.description,
+        nodes: [],
+        edges: [],
+        viewport: { x: 0, y: 0, zoom: 1 },
+        settings: defaultSettings,
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+        created_by: item.created_by,
+        status: item.status as 'draft' | 'active' | 'paused' | 'error',
+        size: item.size
+      }));
+
+      set({ workflows });
+    } catch (error) {
+      console.error('Load workflows error:', error);
     }
   },
 
@@ -242,7 +415,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       const updatedWorkflow = {
         ...state.currentWorkflow,
         nodes: updatedNodes,
-        updatedAt: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       };
       
       return {
@@ -262,7 +435,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       const updatedWorkflow = {
         ...state.currentWorkflow,
         edges: updatedEdges,
-        updatedAt: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       };
       
       return {
@@ -283,7 +456,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     const updatedWorkflow = {
       ...currentWorkflow,
       nodes: [...currentWorkflow.nodes, node],
-      updatedAt: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
 
     set((state) => ({
@@ -307,7 +480,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     const updatedWorkflow = {
       ...currentWorkflow,
       nodes: updatedNodes,
-      updatedAt: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
 
     set((state) => ({
@@ -333,7 +506,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       ...currentWorkflow,
       nodes: updatedNodes,
       edges: updatedEdges,
-      updatedAt: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
 
     set((state) => ({
@@ -370,7 +543,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     const updatedWorkflow = {
       ...currentWorkflow,
       nodes: [...currentWorkflow.nodes, duplicatedNode],
-      updatedAt: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
 
     set((state) => ({
@@ -394,7 +567,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     const updatedWorkflow = {
       ...currentWorkflow,
       nodes: updatedNodes,
-      updatedAt: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
 
     set((state) => ({
@@ -416,7 +589,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     const updatedWorkflow = {
       ...currentWorkflow,
       edges: [...currentWorkflow.edges, edge],
-      updatedAt: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
 
     set((state) => ({
@@ -436,7 +609,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     const updatedWorkflow = {
       ...currentWorkflow,
       edges: currentWorkflow.edges.filter((edge) => edge.id !== id),
-      updatedAt: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
 
     set((state) => ({
@@ -637,7 +810,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
         ...currentWorkflow,
         nodes: previousState.nodes,
         edges: previousState.edges,
-        updatedAt: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       };
       
       set((state) => ({
@@ -658,7 +831,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
         ...currentWorkflow,
         nodes: nextState.nodes,
         edges: nextState.edges,
-        updatedAt: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       };
       
       set((state) => ({
@@ -685,12 +858,12 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     set((state) => ({
       workflows: state.workflows.map((w) =>
         w.id === workflowId
-          ? { ...w, settings: { ...w.settings, ...settings }, updatedAt: new Date().toISOString() }
+          ? { ...w, settings: { ...w.settings, ...settings }, updated_at: new Date().toISOString() }
           : w
       ),
       currentWorkflow:
         state.currentWorkflow?.id === workflowId
-          ? { ...state.currentWorkflow, settings: { ...state.currentWorkflow.settings, ...settings }, updatedAt: new Date().toISOString() }
+          ? { ...state.currentWorkflow, settings: { ...state.currentWorkflow.settings, ...settings }, updated_at: new Date().toISOString() }
           : state.currentWorkflow,
     }));
   },
@@ -698,11 +871,11 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   resetSettings: (workflowId) => {
     set((state) => ({
       workflows: state.workflows.map((w) =>
-        w.id === workflowId ? { ...w, settings: { ...defaultSettings }, updatedAt: new Date().toISOString() } : w
+        w.id === workflowId ? { ...w, settings: { ...defaultSettings }, updated_at: new Date().toISOString() } : w
       ),
       currentWorkflow:
         state.currentWorkflow?.id === workflowId
-          ? { ...state.currentWorkflow, settings: { ...defaultSettings }, updatedAt: new Date().toISOString() }
+          ? { ...state.currentWorkflow, settings: { ...defaultSettings }, updated_at: new Date().toISOString() }
           : state.currentWorkflow,
     }));
   },
