@@ -46,7 +46,20 @@ import {
   FolderOpen,
   FileDown,
   FileUp,
-  TestTube
+  TestTube,
+  Bot,
+  Code,
+  Sparkles,
+  Globe,
+  Layers,
+  GitBranch,
+  Shuffle,
+  Target,
+  Repeat,
+  Hash,
+  Search,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -65,6 +78,9 @@ import WorkflowSettingsPanel from './WorkflowSettingsPanel';
 import ExecutionLogsPanel from './ExecutionLogsPanel';
 import ContextMenu from './ContextMenu';
 import WorkflowTester from './WorkflowTester';
+import AIAssistant from './AIAssistant';
+import CodeEditor from './CodeEditor';
+import ProjectSettings from './ProjectSettings';
 
 // Node types mapping
 const nodeTypes: NodeTypes = {
@@ -76,6 +92,7 @@ const nodeTypes: NodeTypes = {
 
 // Enhanced node templates with more options and unique identifiers
 const nodeTemplates = [
+  // Triggers
   {
     id: 'email-trigger',
     type: 'trigger',
@@ -112,6 +129,26 @@ const nodeTemplates = [
     category: 'Triggers',
     config: { triggerType: 'file' }
   },
+  {
+    id: 'form-trigger',
+    type: 'trigger',
+    label: 'Form Submit',
+    icon: <Target size={20} />,
+    description: 'Trigger when form is submitted',
+    category: 'Triggers',
+    config: { triggerType: 'form' }
+  },
+  {
+    id: 'api-trigger',
+    type: 'trigger',
+    label: 'API Call',
+    icon: <Globe size={20} />,
+    description: 'Trigger via API endpoint',
+    category: 'Triggers',
+    config: { triggerType: 'api' }
+  },
+
+  // Actions
   {
     id: 'send-email-action',
     type: 'action',
@@ -167,6 +204,26 @@ const nodeTemplates = [
     config: { actionType: 'api' }
   },
   {
+    id: 'transform-action',
+    type: 'action',
+    label: 'Transform Data',
+    icon: <Shuffle size={20} />,
+    description: 'Transform and process data',
+    category: 'Actions',
+    config: { actionType: 'transform' }
+  },
+  {
+    id: 'notification-action',
+    type: 'action',
+    label: 'Send Notification',
+    icon: <AlertCircle size={20} />,
+    description: 'Send push notification',
+    category: 'Actions',
+    config: { actionType: 'notification' }
+  },
+
+  // Logic & Control
+  {
     id: 'if-condition',
     type: 'condition',
     label: 'If/Then',
@@ -179,18 +236,38 @@ const nodeTemplates = [
     id: 'switch-condition',
     type: 'condition',
     label: 'Switch/Case',
-    icon: <Filter size={20} />,
+    icon: <GitBranch size={20} />,
     description: 'Multiple condition branches',
     category: 'Logic',
     config: { conditionType: 'switch' }
   },
+  {
+    id: 'loop-condition',
+    type: 'condition',
+    label: 'Loop',
+    icon: <Repeat size={20} />,
+    description: 'Repeat actions in a loop',
+    category: 'Logic',
+    config: { conditionType: 'loop' }
+  },
+  {
+    id: 'merge-condition',
+    type: 'condition',
+    label: 'Merge',
+    icon: <Layers size={20} />,
+    description: 'Merge multiple data streams',
+    category: 'Logic',
+    config: { conditionType: 'merge' }
+  },
+
+  // Utilities
   {
     id: 'delay-timer',
     type: 'delay',
     label: 'Delay',
     icon: <Timer size={20} />,
     description: 'Wait for specified time',
-    category: 'Logic',
+    category: 'Utilities',
     config: { delayType: 'timer', duration: 5, unit: 'minutes' }
   },
   {
@@ -199,9 +276,56 @@ const nodeTemplates = [
     label: 'Wait for Event',
     icon: <Clock size={20} />,
     description: 'Wait for external event',
-    category: 'Logic',
+    category: 'Utilities',
     config: { delayType: 'event' }
   },
+  {
+    id: 'code-function',
+    type: 'action',
+    label: 'Code Function',
+    icon: <Code size={20} />,
+    description: 'Execute custom JavaScript',
+    category: 'Utilities',
+    config: { actionType: 'code' }
+  },
+  {
+    id: 'hash-function',
+    type: 'action',
+    label: 'Hash/Encrypt',
+    icon: <Hash size={20} />,
+    description: 'Hash or encrypt data',
+    category: 'Utilities',
+    config: { actionType: 'hash' }
+  },
+
+  // AI & ML
+  {
+    id: 'ai-text',
+    type: 'action',
+    label: 'AI Text Processing',
+    icon: <Bot size={20} />,
+    description: 'Process text with AI',
+    category: 'AI & ML',
+    config: { actionType: 'ai-text' }
+  },
+  {
+    id: 'ai-image',
+    type: 'action',
+    label: 'AI Image Analysis',
+    icon: <Eye size={20} />,
+    description: 'Analyze images with AI',
+    category: 'AI & ML',
+    config: { actionType: 'ai-image' }
+  },
+  {
+    id: 'ai-sentiment',
+    type: 'action',
+    label: 'Sentiment Analysis',
+    icon: <Sparkles size={20} />,
+    description: 'Analyze text sentiment',
+    category: 'AI & ML',
+    config: { actionType: 'ai-sentiment' }
+  }
 ];
 
 interface EnhancedWorkflowBuilderProps {
@@ -244,6 +368,9 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
   const [showSettings, setShowSettings] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const [showTester, setShowTester] = useState(false);
+  const [showAI, setShowAI] = useState(false);
+  const [showCodeEditor, setShowCodeEditor] = useState(false);
+  const [showProjectSettings, setShowProjectSettings] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -251,6 +378,9 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
     edgeId?: string;
   } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -258,6 +388,16 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
   // Get nodes and edges directly from the store
   const nodes = currentWorkflow?.nodes || [];
   const edges = currentWorkflow?.edges || [];
+
+  // Filter templates based on search and category
+  const filteredTemplates = nodeTemplates.filter(template => {
+    const matchesSearch = template.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         template.description.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = selectedCategory === 'All' || template.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  const categories = ['All', ...Array.from(new Set(nodeTemplates.map(t => t.category)))];
 
   const onConnect = useCallback(
     (params: Connection) => {
@@ -323,7 +463,6 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
   const onDragStart = (event: React.DragEvent, template: typeof nodeTemplates[0]) => {
     event.dataTransfer.effectAllowed = 'move';
     setDraggedTemplate(template);
-    // Store template data in dataTransfer for backup
     event.dataTransfer.setData('application/reactflow', JSON.stringify(template));
   };
 
@@ -434,19 +573,16 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
         const content = e.target?.result as string;
         const importData = JSON.parse(content);
 
-        // Validate import data
         if (!importData.workflow || !importData.metadata) {
           throw new Error('Invalid workflow file format');
         }
 
-        // Check version compatibility
         const supportedVersions = ['1.0.0', '1.1.0'];
         if (!supportedVersions.includes(importData.version)) {
           toast.error(`Unsupported version: ${importData.version}`);
           return;
         }
 
-        // Create new workflow from import
         const importedWorkflow = {
           ...importData.workflow,
           id: `imported-${Date.now()}`,
@@ -463,7 +599,7 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
     };
 
     reader.readAsText(file);
-    event.target.value = ''; // Reset file input
+    event.target.value = '';
   };
 
   const handleNewWorkflow = () => {
@@ -567,6 +703,10 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
             event.preventDefault();
             handleExport();
             break;
+          case '/':
+            event.preventDefault();
+            setShowAI(true);
+            break;
         }
       }
       
@@ -582,7 +722,7 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedNodeId, handleSave, handleRun, undo, redo, deleteNode]);
 
-  const groupedTemplates = nodeTemplates.reduce((acc, template) => {
+  const groupedTemplates = filteredTemplates.reduce((acc, template) => {
     if (!acc[template.category]) {
       acc[template.category] = [];
     }
@@ -594,167 +734,237 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
 
   return (
     <div className="h-screen flex bg-gray-50">
-      {/* Sidebar */}
+      {/* Enhanced Sidebar */}
       <motion.div 
         initial={{ x: -300 }}
-        animate={{ x: 0 }}
-        className="w-80 bg-white border-r border-gray-200 flex flex-col"
+        animate={{ x: sidebarCollapsed ? -240 : 0 }}
+        className={`${sidebarCollapsed ? 'w-16' : 'w-80'} bg-white border-r border-gray-200 flex flex-col transition-all duration-300`}
       >
         {/* Header */}
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Enhanced Workflow Builder</h2>
-          <p className="text-sm text-gray-600">Drag and drop to build your automation</p>
-        </div>
-
-        {/* File Operations */}
         <div className="p-4 border-b border-gray-200">
-          <div className="grid grid-cols-2 gap-2 mb-3">
-            <button
-              onClick={handleNewWorkflow}
-              className="flex items-center justify-center px-3 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm"
-              title="New workflow (Ctrl+N)"
-            >
-              <Plus size={16} className="mr-1" />
-              New
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={isSaving}
-              className="flex items-center justify-center px-3 py-2 bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-colors text-sm disabled:opacity-50"
-              title="Save workflow (Ctrl+S)"
-            >
-              {isSaving ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-              ) : (
-                <>
-                  <Save size={16} className="mr-1" />
-                  Save
-                </>
-              )}
-            </button>
-          </div>
-          
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              onClick={handleImport}
-              className="flex items-center justify-center px-2 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm"
-              title="Import workflow (Ctrl+O)"
-            >
-              <FileUp size={16} />
-            </button>
-            <button
-              onClick={handleExport}
-              className="flex items-center justify-center px-2 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm"
-              title="Export workflow (Ctrl+E)"
-            >
-              <FileDown size={16} />
-            </button>
-            <button
-              onClick={() => setShowTester(!showTester)}
-              className={`flex items-center justify-center px-2 py-2 rounded-lg transition-colors text-sm ${
-                showTester ? 'bg-blue-600 text-white' : 'bg-gray-600 text-white hover:bg-gray-700'
-              }`}
-              title="Test suite"
-            >
-              <TestTube size={16} />
-            </button>
-          </div>
-          
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json"
-            onChange={handleFileImport}
-            className="hidden"
-          />
-        </div>
+          {!sidebarCollapsed && (
+            <>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-gray-900">FlowMind Builder</h2>
+                <button
+                  onClick={() => setSidebarCollapsed(true)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <EyeOff size={18} />
+                </button>
+              </div>
+              <p className="text-sm text-gray-600 mb-4">Drag and drop to build your automation</p>
+              
+              {/* Search */}
+              <div className="relative mb-4">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search nodes..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+                />
+              </div>
 
-        {/* Actions */}
-        <div className="p-4 border-b border-gray-200">
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={handleRun}
-              disabled={isExecuting || !currentWorkflow?.nodes.length}
-              className="flex items-center justify-center px-3 py-2 bg-success-600 text-white rounded-lg hover:bg-success-700 transition-colors disabled:opacity-50 text-sm"
-              title="Run workflow (Ctrl+R)"
-            >
-              <Play size={16} className="mr-1" />
-              {isExecuting ? 'Running...' : 'Run'}
-            </button>
-            <button
-              onClick={stopExecution}
-              disabled={!isExecuting}
-              className="flex items-center justify-center px-3 py-2 bg-error-600 text-white rounded-lg hover:bg-error-700 transition-colors disabled:opacity-50 text-sm"
-              title="Stop execution"
-            >
-              <Square size={16} className="mr-1" />
-              Stop
-            </button>
-          </div>
-          
-          <div className="grid grid-cols-3 gap-2 mt-2">
-            <button
-              onClick={undo}
-              disabled={!canUndo()}
-              className="flex items-center justify-center px-2 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 text-sm"
-              title="Undo (Ctrl+Z)"
-            >
-              <RotateCcw size={16} />
-            </button>
-            <button
-              onClick={redo}
-              disabled={!canRedo()}
-              className="flex items-center justify-center px-2 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 text-sm"
-              title="Redo (Ctrl+Shift+Z)"
-            >
-              <RotateCw size={16} />
-            </button>
-            <div className="flex items-center justify-center px-2 py-2 bg-gray-100 rounded-lg text-sm">
-              {isExecuting ? `${Math.round(executionProgress)}%` : '0%'}
-            </div>
-          </div>
-        </div>
-
-        {/* Node Templates */}
-        <div className="flex-1 overflow-y-auto p-4">
-          {Object.entries(groupedTemplates).map(([category, templates]) => (
-            <div key={category} className="mb-6">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">
-                {category}
-              </h3>
-              <div className="space-y-2">
-                {templates.map((template) => (
-                  <motion.div
-                    key={template.id}
-                    className={`p-3 bg-white border border-gray-200 rounded-lg cursor-grab hover:border-accent-300 hover:shadow-sm transition-all ${
-                      draggedTemplate?.id === template.id ? 'opacity-50' : ''
+              {/* Category Filter */}
+              <div className="flex flex-wrap gap-1 mb-4">
+                {categories.map((category) => (
+                  <button
+                    key={category}
+                    onClick={() => setSelectedCategory(category)}
+                    className={`px-2 py-1 text-xs rounded-full transition-colors ${
+                      selectedCategory === category
+                        ? 'bg-accent-100 text-accent-700'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
-                    draggable
-                    onDragStart={(e) => onDragStart(e, template)}
-                    onDragEnd={onDragEnd}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
                   >
-                    <div className="flex items-center mb-2">
-                      <div className="text-accent-600 mr-2">
-                        {template.icon}
-                      </div>
-                      <span className="font-medium text-gray-900 text-sm">
-                        {template.label}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-600">{template.description}</p>
-                  </motion.div>
+                    {category}
+                  </button>
                 ))}
               </div>
-            </div>
-          ))}
+            </>
+          )}
+          
+          {sidebarCollapsed && (
+            <button
+              onClick={() => setSidebarCollapsed(false)}
+              className="w-full flex justify-center text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <Eye size={18} />
+            </button>
+          )}
         </div>
+
+        {!sidebarCollapsed && (
+          <>
+            {/* File Operations */}
+            <div className="p-4 border-b border-gray-200">
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <button
+                  onClick={handleNewWorkflow}
+                  className="flex items-center justify-center px-3 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm"
+                  title="New workflow (Ctrl+N)"
+                >
+                  <Plus size={16} className="mr-1" />
+                  New
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className="flex items-center justify-center px-3 py-2 bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-colors text-sm disabled:opacity-50"
+                  title="Save workflow (Ctrl+S)"
+                >
+                  {isSaving ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  ) : (
+                    <>
+                      <Save size={16} className="mr-1" />
+                      Save
+                    </>
+                  )}
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-4 gap-2">
+                <button
+                  onClick={handleImport}
+                  className="flex items-center justify-center px-2 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm"
+                  title="Import workflow (Ctrl+O)"
+                >
+                  <FileUp size={16} />
+                </button>
+                <button
+                  onClick={handleExport}
+                  className="flex items-center justify-center px-2 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm"
+                  title="Export workflow (Ctrl+E)"
+                >
+                  <FileDown size={16} />
+                </button>
+                <button
+                  onClick={() => setShowTester(!showTester)}
+                  className={`flex items-center justify-center px-2 py-2 rounded-lg transition-colors text-sm ${
+                    showTester ? 'bg-blue-600 text-white' : 'bg-gray-600 text-white hover:bg-gray-700'
+                  }`}
+                  title="Test suite"
+                >
+                  <TestTube size={16} />
+                </button>
+                <button
+                  onClick={() => setShowAI(!showAI)}
+                  className={`flex items-center justify-center px-2 py-2 rounded-lg transition-colors text-sm ${
+                    showAI ? 'bg-accent-600 text-white' : 'bg-gray-600 text-white hover:bg-gray-700'
+                  }`}
+                  title="AI Assistant (Ctrl+/)"
+                >
+                  <Bot size={16} />
+                </button>
+              </div>
+              
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json"
+                onChange={handleFileImport}
+                className="hidden"
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="p-4 border-b border-gray-200">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={handleRun}
+                  disabled={isExecuting || !currentWorkflow?.nodes.length}
+                  className="flex items-center justify-center px-3 py-2 bg-success-600 text-white rounded-lg hover:bg-success-700 transition-colors disabled:opacity-50 text-sm"
+                  title="Run workflow (Ctrl+R)"
+                >
+                  <Play size={16} className="mr-1" />
+                  {isExecuting ? 'Running...' : 'Run'}
+                </button>
+                <button
+                  onClick={stopExecution}
+                  disabled={!isExecuting}
+                  className="flex items-center justify-center px-3 py-2 bg-error-600 text-white rounded-lg hover:bg-error-700 transition-colors disabled:opacity-50 text-sm"
+                  title="Stop execution"
+                >
+                  <Square size={16} className="mr-1" />
+                  Stop
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-4 gap-2 mt-2">
+                <button
+                  onClick={undo}
+                  disabled={!canUndo()}
+                  className="flex items-center justify-center px-2 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 text-sm"
+                  title="Undo (Ctrl+Z)"
+                >
+                  <RotateCcw size={16} />
+                </button>
+                <button
+                  onClick={redo}
+                  disabled={!canRedo()}
+                  className="flex items-center justify-center px-2 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 text-sm"
+                  title="Redo (Ctrl+Shift+Z)"
+                >
+                  <RotateCw size={16} />
+                </button>
+                <button
+                  onClick={() => setShowCodeEditor(true)}
+                  className="flex items-center justify-center px-2 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm"
+                  title="Code Editor"
+                >
+                  <Code size={16} />
+                </button>
+                <div className="flex items-center justify-center px-2 py-2 bg-gray-100 rounded-lg text-sm">
+                  {isExecuting ? `${Math.round(executionProgress)}%` : '0%'}
+                </div>
+              </div>
+            </div>
+
+            {/* Node Templates */}
+            <div className="flex-1 overflow-y-auto p-4">
+              {Object.entries(groupedTemplates).map(([category, templates]) => (
+                <div key={category} className="mb-6">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">
+                    {category}
+                  </h3>
+                  <div className="space-y-2">
+                    {templates.map((template) => (
+                      <motion.div
+                        key={template.id}
+                        className={`p-3 bg-white border border-gray-200 rounded-lg cursor-grab hover:border-accent-300 hover:shadow-sm transition-all ${
+                          draggedTemplate?.id === template.id ? 'opacity-50' : ''
+                        }`}
+                        draggable
+                        onDragStart={(e) => onDragStart(e, template)}
+                        onDragEnd={onDragEnd}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        <div className="flex items-center mb-2">
+                          <div className="text-accent-600 mr-2">
+                            {template.icon}
+                          </div>
+                          <span className="font-medium text-gray-900 text-sm">
+                            {template.label}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-600">{template.description}</p>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </motion.div>
 
       {/* Main Canvas */}
       <div className="flex-1 flex flex-col">
-        {/* Toolbar */}
+        {/* Enhanced Toolbar */}
         <div className="bg-white border-b border-gray-200 p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
@@ -772,6 +982,13 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
               )}
             </div>
             <div className="flex items-center space-x-2">
+              <button 
+                onClick={() => setShowProjectSettings(true)}
+                className="p-2 rounded-lg transition-colors text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                title="Project settings"
+              >
+                <FolderOpen size={18} />
+              </button>
               <button 
                 onClick={() => setShowLogs(!showLogs)}
                 className={`p-2 rounded-lg transition-colors ${
@@ -840,6 +1057,24 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
           </ReactFlow>
         </div>
       </div>
+
+      {/* AI Assistant */}
+      <AIAssistant 
+        isOpen={showAI} 
+        onClose={() => setShowAI(false)} 
+      />
+
+      {/* Code Editor */}
+      <CodeEditor 
+        isOpen={showCodeEditor} 
+        onClose={() => setShowCodeEditor(false)} 
+      />
+
+      {/* Project Settings */}
+      <ProjectSettings 
+        isOpen={showProjectSettings} 
+        onClose={() => setShowProjectSettings(false)} 
+      />
 
       {/* Test Suite Panel */}
       <AnimatePresence>
