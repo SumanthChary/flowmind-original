@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { Node, Edge, Connection, applyNodeChanges, applyEdgeChanges, NodeChange, EdgeChange } from 'reactflow';
+import { workflowService } from '../services/workflowService';
 import toast from 'react-hot-toast';
 
 export interface WorkflowNode extends Node {
@@ -33,6 +34,8 @@ export interface Workflow {
   updatedAt: string;
   lastExecuted?: string;
   status: 'draft' | 'active' | 'paused' | 'error';
+  version?: number;
+  size?: number;
 }
 
 export interface WorkflowSettings {
@@ -64,14 +67,15 @@ interface WorkflowState {
   selectedNodeId: string | null;
   history: Array<{ nodes: WorkflowNode[]; edges: WorkflowEdge[] }>;
   historyIndex: number;
+  collaborators: any[];
   
   // Actions
   setCurrentWorkflow: (workflow: Workflow | null) => void;
   createWorkflow: (name: string, description?: string) => Workflow;
   updateWorkflow: (id: string, updates: Partial<Workflow>) => void;
   deleteWorkflow: (id: string) => void;
-  saveWorkflow: (workflow: Workflow) => void;
-  loadWorkflow: (id: string) => Workflow | null;
+  saveWorkflow: (workflow: Workflow) => Promise<void>;
+  loadWorkflow: (id: string) => Promise<Workflow | null>;
   
   // ReactFlow integration
   onNodesChangeRF: (changes: NodeChange[]) => void;
@@ -111,6 +115,13 @@ interface WorkflowState {
   addLog: (log: Omit<ExecutionLog, 'id' | 'timestamp'>) => void;
   clearLogs: (workflowId?: string) => void;
   getLogsForWorkflow: (workflowId: string) => ExecutionLog[];
+  
+  // Collaboration
+  setCollaborators: (collaborators: any[]) => void;
+  
+  // Performance
+  getWorkflowSize: (workflow: Workflow) => number;
+  validateWorkflowSize: (workflow: Workflow) => boolean;
 }
 
 const defaultSettings: WorkflowSettings = {
@@ -131,6 +142,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   selectedNodeId: null,
   history: [],
   historyIndex: -1,
+  collaborators: [],
 
   setCurrentWorkflow: (workflow) => {
     set({ currentWorkflow: workflow });
@@ -155,6 +167,8 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       status: 'draft',
+      version: 1,
+      size: 0
     };
 
     set((state) => ({
@@ -186,12 +200,10 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     }));
   },
 
-  saveWorkflow: (workflow) => {
+  saveWorkflow: async (workflow) => {
     try {
-      // Save to localStorage
-      localStorage.setItem(`workflow-${workflow.id}`, JSON.stringify(workflow));
+      await workflowService.autoSave(workflow, { immediate: true });
       
-      // Update workflows array
       set((state) => ({
         workflows: state.workflows.map((w) => (w.id === workflow.id ? workflow : w)),
         currentWorkflow: state.currentWorkflow?.id === workflow.id ? workflow : state.currentWorkflow,
@@ -202,11 +214,10 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     }
   },
 
-  loadWorkflow: (id) => {
+  loadWorkflow: async (id) => {
     try {
-      const saved = localStorage.getItem(`workflow-${id}`);
-      if (saved) {
-        const workflow = JSON.parse(saved);
+      const workflow = await workflowService.load(id);
+      if (workflow) {
         set((state) => ({
           workflows: state.workflows.some((w) => w.id === id)
             ? state.workflows.map((w) => (w.id === id ? workflow : w))
@@ -215,12 +226,12 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
           history: [{ nodes: [...workflow.nodes], edges: [...workflow.edges] }],
           historyIndex: 0,
         }));
-        return workflow;
       }
+      return workflow;
     } catch (error) {
       console.error('Load error:', error);
+      return null;
     }
-    return null;
   },
 
   onNodesChangeRF: (changes) => {
@@ -720,4 +731,22 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     const { executionLogs } = get();
     return executionLogs.filter((log) => log.workflowId === workflowId);
   },
+
+  setCollaborators: (collaborators) => {
+    set({ collaborators });
+  },
+
+  getWorkflowSize: (workflow) => {
+    const data = JSON.stringify({
+      nodes: workflow.nodes,
+      edges: workflow.edges,
+      settings: workflow.settings
+    });
+    return new Blob([data]).size;
+  },
+
+  validateWorkflowSize: (workflow) => {
+    const size = get().getWorkflowSize(workflow);
+    return size <= 1024 * 1024; // 1MB limit
+  }
 }));
