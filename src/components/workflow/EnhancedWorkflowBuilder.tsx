@@ -74,105 +74,133 @@ const nodeTypes: NodeTypes = {
   delay: DelayNode,
 };
 
-// Enhanced node templates with more options
+// Enhanced node templates with more options and unique identifiers
 const nodeTemplates = [
   {
+    id: 'email-trigger',
     type: 'trigger',
     label: 'Email Trigger',
     icon: <Mail size={20} />,
     description: 'Trigger when email is received',
-    category: 'Triggers'
+    category: 'Triggers',
+    config: { triggerType: 'email' }
   },
   {
+    id: 'webhook-trigger',
     type: 'trigger',
     label: 'Webhook',
     icon: <Webhook size={20} />,
     description: 'Trigger via HTTP webhook',
-    category: 'Triggers'
+    category: 'Triggers',
+    config: { triggerType: 'webhook' }
   },
   {
+    id: 'schedule-trigger',
     type: 'trigger',
     label: 'Schedule',
     icon: <Timer size={20} />,
     description: 'Trigger on schedule',
-    category: 'Triggers'
+    category: 'Triggers',
+    config: { triggerType: 'schedule' }
   },
   {
+    id: 'file-trigger',
     type: 'trigger',
     label: 'File Upload',
     icon: <FileText size={20} />,
     description: 'Trigger when file is uploaded',
-    category: 'Triggers'
+    category: 'Triggers',
+    config: { triggerType: 'file' }
   },
   {
+    id: 'send-email-action',
     type: 'action',
     label: 'Send Email',
     icon: <Mail size={20} />,
     description: 'Send an email message',
-    category: 'Actions'
+    category: 'Actions',
+    config: { actionType: 'email' }
   },
   {
+    id: 'calendar-action',
     type: 'action',
     label: 'Create Calendar Event',
     icon: <Calendar size={20} />,
     description: 'Create a calendar event',
-    category: 'Actions'
+    category: 'Actions',
+    config: { actionType: 'calendar' }
   },
   {
+    id: 'document-action',
     type: 'action',
     label: 'Create Document',
     icon: <FileText size={20} />,
     description: 'Create a new document',
-    category: 'Actions'
+    category: 'Actions',
+    config: { actionType: 'document' }
   },
   {
+    id: 'database-action',
     type: 'action',
     label: 'Update Database',
     icon: <Database size={20} />,
     description: 'Update database record',
-    category: 'Actions'
+    category: 'Actions',
+    config: { actionType: 'database' }
   },
   {
+    id: 'slack-action',
     type: 'action',
     label: 'Send Slack Message',
     icon: <MessageSquare size={20} />,
     description: 'Send message to Slack',
-    category: 'Actions'
+    category: 'Actions',
+    config: { actionType: 'slack' }
   },
   {
+    id: 'api-action',
     type: 'action',
     label: 'Call API',
     icon: <Webhook size={20} />,
     description: 'Make HTTP API call',
-    category: 'Actions'
+    category: 'Actions',
+    config: { actionType: 'api' }
   },
   {
+    id: 'if-condition',
     type: 'condition',
     label: 'If/Then',
     icon: <Filter size={20} />,
     description: 'Conditional logic',
-    category: 'Logic'
+    category: 'Logic',
+    config: { conditionType: 'if' }
   },
   {
+    id: 'switch-condition',
     type: 'condition',
     label: 'Switch/Case',
     icon: <Filter size={20} />,
     description: 'Multiple condition branches',
-    category: 'Logic'
+    category: 'Logic',
+    config: { conditionType: 'switch' }
   },
   {
+    id: 'delay-timer',
     type: 'delay',
     label: 'Delay',
     icon: <Timer size={20} />,
     description: 'Wait for specified time',
-    category: 'Logic'
+    category: 'Logic',
+    config: { delayType: 'timer', duration: 5, unit: 'minutes' }
   },
   {
+    id: 'wait-event',
     type: 'delay',
     label: 'Wait for Event',
     icon: <Clock size={20} />,
     description: 'Wait for external event',
-    category: 'Logic'
+    category: 'Logic',
+    config: { delayType: 'event' }
   },
 ];
 
@@ -212,7 +240,7 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
   } = useWorkflowStore();
 
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
-  const [draggedType, setDraggedType] = useState<string | null>(null);
+  const [draggedTemplate, setDraggedTemplate] = useState<typeof nodeTemplates[0] | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const [showTester, setShowTester] = useState(false);
@@ -222,6 +250,7 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
     nodeId?: string;
     edgeId?: string;
   } | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -235,12 +264,13 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
       if (validateConnection(params)) {
         const newEdge: WorkflowEdge = {
           ...params,
-          id: `edge-${Date.now()}`,
+          id: `edge-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           type: 'smoothstep',
           animated: true,
           data: { status: 'idle' },
         };
         addWorkflowEdge(newEdge);
+        toast.success('Connection created successfully');
       } else {
         toast.error('Invalid connection');
       }
@@ -261,104 +291,133 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
     (event: React.DragEvent) => {
       event.preventDefault();
 
-      if (!reactFlowInstance || !reactFlowWrapper.current) return;
+      if (!reactFlowInstance || !reactFlowWrapper.current || !draggedTemplate) return;
 
       const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect();
-      const type = event.dataTransfer.getData('application/reactflow');
-
-      if (!type) return;
-
       const position = reactFlowInstance.project({
         x: event.clientX - reactFlowBounds.left,
         y: event.clientY - reactFlowBounds.top,
       });
 
-      const template = nodeTemplates.find(t => t.type === type);
-      if (!template) return;
-
       const newNode: WorkflowNode = {
-        id: `${type}-${Date.now()}`,
-        type,
+        id: `${draggedTemplate.id}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        type: draggedTemplate.type,
         position,
         data: {
-          label: template.label,
-          icon: template.icon,
-          type: template.type,
-          config: {},
+          label: draggedTemplate.label,
+          icon: draggedTemplate.icon,
+          type: draggedTemplate.type,
+          config: { ...draggedTemplate.config },
           active: true,
           status: 'idle',
         },
       };
 
       addNode(newNode);
+      setDraggedTemplate(null);
+      toast.success(`${draggedTemplate.label} added to workflow`);
     },
-    [reactFlowInstance, addNode]
+    [reactFlowInstance, draggedTemplate, addNode]
   );
 
-  const onDragStart = (event: React.DragEvent, nodeType: string) => {
-    event.dataTransfer.setData('application/reactflow', nodeType);
+  const onDragStart = (event: React.DragEvent, template: typeof nodeTemplates[0]) => {
     event.dataTransfer.effectAllowed = 'move';
-    setDraggedType(nodeType);
+    setDraggedTemplate(template);
+    // Store template data in dataTransfer for backup
+    event.dataTransfer.setData('application/reactflow', JSON.stringify(template));
   };
 
   const onDragEnd = () => {
-    setDraggedType(null);
+    setDraggedTemplate(null);
   };
 
-  const handleSave = () => {
-    if (!currentWorkflow || !reactFlowInstance) return;
-
-    const flow = reactFlowInstance.toObject();
-    const updatedWorkflow = {
-      ...currentWorkflow,
-      nodes: flow.nodes,
-      edges: flow.edges,
-      viewport: flow.viewport,
-      updatedAt: new Date().toISOString(),
-    };
-
-    saveWorkflow(updatedWorkflow);
-    if (onSave) {
-      onSave(updatedWorkflow);
+  const handleSave = async () => {
+    if (!currentWorkflow || !reactFlowInstance) {
+      toast.error('No workflow to save');
+      return;
     }
-    toast.success('Workflow saved successfully!');
-  };
 
-  const handleRun = async () => {
-    if (!currentWorkflow) return;
-    await executeWorkflow(currentWorkflow.id);
-  };
-
-  const handleExport = () => {
-    if (!reactFlowInstance || !currentWorkflow) return;
-
-    const flow = reactFlowInstance.toObject();
-    const exportData = {
-      workflow: {
+    setIsSaving(true);
+    try {
+      const flow = reactFlowInstance.toObject();
+      const updatedWorkflow = {
         ...currentWorkflow,
         nodes: flow.nodes,
         edges: flow.edges,
         viewport: flow.viewport,
-      },
-      exportedAt: new Date().toISOString(),
-      version: '1.0.0',
-      metadata: {
-        nodeCount: flow.nodes.length,
-        edgeCount: flow.edges.length,
-        exportFormat: 'json'
-      }
-    };
+        updatedAt: new Date().toISOString(),
+      };
 
-    const dataStr = JSON.stringify(exportData, null, 2);
-    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+      saveWorkflow(updatedWorkflow);
+      if (onSave) {
+        onSave(updatedWorkflow);
+      }
+      toast.success('Workflow saved successfully!');
+    } catch (error) {
+      toast.error('Failed to save workflow');
+      console.error('Save error:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleRun = async () => {
+    if (!currentWorkflow) {
+      toast.error('No workflow to execute');
+      return;
+    }
     
-    const exportFileDefaultName = `${currentWorkflow.name.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.json`;
-    const linkElement = document.createElement('a');
-    linkElement.setAttribute('href', dataUri);
-    linkElement.setAttribute('download', exportFileDefaultName);
-    linkElement.click();
-    
-    toast.success('Workflow exported successfully!');
+    if (currentWorkflow.nodes.length === 0) {
+      toast.error('Workflow has no nodes to execute');
+      return;
+    }
+
+    try {
+      await executeWorkflow(currentWorkflow.id);
+    } catch (error) {
+      toast.error('Failed to execute workflow');
+      console.error('Execution error:', error);
+    }
+  };
+
+  const handleExport = () => {
+    if (!reactFlowInstance || !currentWorkflow) {
+      toast.error('No workflow to export');
+      return;
+    }
+
+    try {
+      const flow = reactFlowInstance.toObject();
+      const exportData = {
+        workflow: {
+          ...currentWorkflow,
+          nodes: flow.nodes,
+          edges: flow.edges,
+          viewport: flow.viewport,
+        },
+        exportedAt: new Date().toISOString(),
+        version: '1.0.0',
+        metadata: {
+          nodeCount: flow.nodes.length,
+          edgeCount: flow.edges.length,
+          exportFormat: 'json'
+        }
+      };
+
+      const dataStr = JSON.stringify(exportData, null, 2);
+      const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+      
+      const exportFileDefaultName = `${currentWorkflow.name.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.json`;
+      const linkElement = document.createElement('a');
+      linkElement.setAttribute('href', dataUri);
+      linkElement.setAttribute('download', exportFileDefaultName);
+      linkElement.click();
+      
+      toast.success('Workflow exported successfully!');
+    } catch (error) {
+      toast.error('Failed to export workflow');
+      console.error('Export error:', error);
+    }
   };
 
   const handleImport = () => {
@@ -397,7 +456,6 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
         };
 
         setCurrentWorkflow(importedWorkflow);
-
         toast.success('Workflow imported successfully!');
       } catch (error) {
         toast.error(`Failed to import workflow: ${error}`);
@@ -445,20 +503,33 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
   const handleContextMenuAction = (action: string, id?: string) => {
     if (!id) return;
 
-    switch (action) {
-      case 'delete':
-        if (contextMenu?.nodeId) {
-          deleteNode(id);
-        } else if (contextMenu?.edgeId) {
-          deleteEdge(id);
-        }
-        break;
-      case 'duplicate':
-        duplicateNode(id);
-        break;
-      case 'toggle':
-        toggleNodeActive(id);
-        break;
+    try {
+      switch (action) {
+        case 'delete':
+          if (contextMenu?.nodeId) {
+            deleteNode(id);
+            toast.success('Node deleted');
+          } else if (contextMenu?.edgeId) {
+            deleteEdge(id);
+            toast.success('Connection deleted');
+          }
+          break;
+        case 'duplicate':
+          duplicateNode(id);
+          toast.success('Node duplicated');
+          break;
+        case 'toggle':
+          toggleNodeActive(id);
+          const node = nodes.find(n => n.id === id);
+          toast.success(`Node ${node?.data.active ? 'deactivated' : 'activated'}`);
+          break;
+        case 'edit':
+          setSelectedNode(id);
+          break;
+      }
+    } catch (error) {
+      toast.error('Action failed');
+      console.error('Context menu action error:', error);
     }
     setContextMenu(null);
   };
@@ -502,6 +573,7 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
       if (event.key === 'Delete' || event.key === 'Backspace') {
         if (selectedNodeId) {
           deleteNode(selectedNodeId);
+          toast.success('Node deleted');
         }
       }
     };
@@ -547,11 +619,18 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
             </button>
             <button
               onClick={handleSave}
-              className="flex items-center justify-center px-3 py-2 bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-colors text-sm"
+              disabled={isSaving}
+              className="flex items-center justify-center px-3 py-2 bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-colors text-sm disabled:opacity-50"
               title="Save workflow (Ctrl+S)"
             >
-              <Save size={16} className="mr-1" />
-              Save
+              {isSaving ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              ) : (
+                <>
+                  <Save size={16} className="mr-1" />
+                  Save
+                </>
+              )}
             </button>
           </div>
           
@@ -644,14 +723,14 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
                 {category}
               </h3>
               <div className="space-y-2">
-                {templates.map((template, index) => (
+                {templates.map((template) => (
                   <motion.div
-                    key={`${template.type}-${index}`}
+                    key={template.id}
                     className={`p-3 bg-white border border-gray-200 rounded-lg cursor-grab hover:border-accent-300 hover:shadow-sm transition-all ${
-                      draggedType === template.type ? 'opacity-50' : ''
+                      draggedTemplate?.id === template.id ? 'opacity-50' : ''
                     }`}
                     draggable
-                    onDragStart={(e) => onDragStart(e, template.type)}
+                    onDragStart={(e) => onDragStart(e, template)}
                     onDragEnd={onDragEnd}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
@@ -797,9 +876,16 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
             onDelete={() => {
               deleteNode(selectedNode.id);
               setSelectedNode(null);
+              toast.success('Node deleted');
             }}
-            onDuplicate={() => duplicateNode(selectedNode.id)}
-            onToggleActive={() => toggleNodeActive(selectedNode.id)}
+            onDuplicate={() => {
+              duplicateNode(selectedNode.id);
+              toast.success('Node duplicated');
+            }}
+            onToggleActive={() => {
+              toggleNodeActive(selectedNode.id);
+              toast.success(`Node ${selectedNode.data.active ? 'deactivated' : 'activated'}`);
+            }}
           />
         )}
       </AnimatePresence>

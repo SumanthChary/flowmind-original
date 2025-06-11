@@ -132,11 +132,20 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   history: [],
   historyIndex: -1,
 
-  setCurrentWorkflow: (workflow) => set({ currentWorkflow: workflow }),
+  setCurrentWorkflow: (workflow) => {
+    set({ currentWorkflow: workflow });
+    if (workflow) {
+      // Initialize history with current state
+      set({ 
+        history: [{ nodes: [...workflow.nodes], edges: [...workflow.edges] }],
+        historyIndex: 0 
+      });
+    }
+  },
 
   createWorkflow: (name, description) => {
     const workflow: Workflow = {
-      id: `workflow-${Date.now()}`,
+      id: `workflow-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       name,
       description,
       nodes: [],
@@ -151,6 +160,8 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     set((state) => ({
       workflows: [...state.workflows, workflow],
       currentWorkflow: workflow,
+      history: [{ nodes: [], edges: [] }],
+      historyIndex: 0,
     }));
 
     return workflow;
@@ -177,14 +188,17 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
 
   saveWorkflow: (workflow) => {
     try {
+      // Save to localStorage
       localStorage.setItem(`workflow-${workflow.id}`, JSON.stringify(workflow));
+      
+      // Update workflows array
       set((state) => ({
         workflows: state.workflows.map((w) => (w.id === workflow.id ? workflow : w)),
+        currentWorkflow: state.currentWorkflow?.id === workflow.id ? workflow : state.currentWorkflow,
       }));
-      toast.success('Workflow saved successfully!');
     } catch (error) {
-      toast.error('Failed to save workflow');
       console.error('Save error:', error);
+      throw error;
     }
   },
 
@@ -198,11 +212,12 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
             ? state.workflows.map((w) => (w.id === id ? workflow : w))
             : [...state.workflows, workflow],
           currentWorkflow: workflow,
+          history: [{ nodes: [...workflow.nodes], edges: [...workflow.edges] }],
+          historyIndex: 0,
         }));
         return workflow;
       }
     } catch (error) {
-      toast.error('Failed to load workflow');
       console.error('Load error:', error);
     }
     return null;
@@ -213,11 +228,17 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       if (!state.currentWorkflow) return state;
       
       const updatedNodes = applyNodeChanges(changes, state.currentWorkflow.nodes);
+      const updatedWorkflow = {
+        ...state.currentWorkflow,
+        nodes: updatedNodes,
+        updatedAt: new Date().toISOString(),
+      };
+      
       return {
-        currentWorkflow: {
-          ...state.currentWorkflow,
-          nodes: updatedNodes,
-        },
+        currentWorkflow: updatedWorkflow,
+        workflows: state.workflows.map(w => 
+          w.id === updatedWorkflow.id ? updatedWorkflow : w
+        ),
       };
     });
   },
@@ -227,11 +248,17 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       if (!state.currentWorkflow) return state;
       
       const updatedEdges = applyEdgeChanges(changes, state.currentWorkflow.edges);
+      const updatedWorkflow = {
+        ...state.currentWorkflow,
+        edges: updatedEdges,
+        updatedAt: new Date().toISOString(),
+      };
+      
       return {
-        currentWorkflow: {
-          ...state.currentWorkflow,
-          edges: updatedEdges,
-        },
+        currentWorkflow: updatedWorkflow,
+        workflows: state.workflows.map(w => 
+          w.id === updatedWorkflow.id ? updatedWorkflow : w
+        ),
       };
     });
   },
@@ -240,13 +267,19 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     const { currentWorkflow, addToHistory } = get();
     if (!currentWorkflow) return;
 
-    const newNodes = [...currentWorkflow.nodes, node];
     addToHistory(currentWorkflow.nodes, currentWorkflow.edges);
 
+    const updatedWorkflow = {
+      ...currentWorkflow,
+      nodes: [...currentWorkflow.nodes, node],
+      updatedAt: new Date().toISOString(),
+    };
+
     set((state) => ({
-      currentWorkflow: state.currentWorkflow
-        ? { ...state.currentWorkflow, nodes: newNodes }
-        : null,
+      currentWorkflow: updatedWorkflow,
+      workflows: state.workflows.map(w => 
+        w.id === updatedWorkflow.id ? updatedWorkflow : w
+      ),
     }));
   },
 
@@ -256,15 +289,21 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
 
     addToHistory(currentWorkflow.nodes, currentWorkflow.edges);
 
+    const updatedNodes = currentWorkflow.nodes.map((node) =>
+      node.id === id ? { ...node, data: { ...node.data, ...updates } } : node
+    );
+
+    const updatedWorkflow = {
+      ...currentWorkflow,
+      nodes: updatedNodes,
+      updatedAt: new Date().toISOString(),
+    };
+
     set((state) => ({
-      currentWorkflow: state.currentWorkflow
-        ? {
-            ...state.currentWorkflow,
-            nodes: state.currentWorkflow.nodes.map((node) =>
-              node.id === id ? { ...node, data: { ...node.data, ...updates } } : node
-            ),
-          }
-        : null,
+      currentWorkflow: updatedWorkflow,
+      workflows: state.workflows.map(w => 
+        w.id === updatedWorkflow.id ? updatedWorkflow : w
+      ),
     }));
   },
 
@@ -274,16 +313,23 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
 
     addToHistory(currentWorkflow.nodes, currentWorkflow.edges);
 
+    const updatedNodes = currentWorkflow.nodes.filter((node) => node.id !== id);
+    const updatedEdges = currentWorkflow.edges.filter(
+      (edge) => edge.source !== id && edge.target !== id
+    );
+
+    const updatedWorkflow = {
+      ...currentWorkflow,
+      nodes: updatedNodes,
+      edges: updatedEdges,
+      updatedAt: new Date().toISOString(),
+    };
+
     set((state) => ({
-      currentWorkflow: state.currentWorkflow
-        ? {
-            ...state.currentWorkflow,
-            nodes: state.currentWorkflow.nodes.filter((node) => node.id !== id),
-            edges: state.currentWorkflow.edges.filter(
-              (edge) => edge.source !== id && edge.target !== id
-            ),
-          }
-        : null,
+      currentWorkflow: updatedWorkflow,
+      workflows: state.workflows.map(w => 
+        w.id === updatedWorkflow.id ? updatedWorkflow : w
+      ),
       selectedNodeId: state.selectedNodeId === id ? null : state.selectedNodeId,
     }));
   },
@@ -299,7 +345,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
 
     const duplicatedNode: WorkflowNode = {
       ...originalNode,
-      id: `${originalNode.id}-copy-${Date.now()}`,
+      id: `${originalNode.id}-copy-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       position: {
         x: originalNode.position.x + 50,
         y: originalNode.position.y + 50,
@@ -310,13 +356,17 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       },
     };
 
+    const updatedWorkflow = {
+      ...currentWorkflow,
+      nodes: [...currentWorkflow.nodes, duplicatedNode],
+      updatedAt: new Date().toISOString(),
+    };
+
     set((state) => ({
-      currentWorkflow: state.currentWorkflow
-        ? {
-            ...state.currentWorkflow,
-            nodes: [...state.currentWorkflow.nodes, duplicatedNode],
-          }
-        : null,
+      currentWorkflow: updatedWorkflow,
+      workflows: state.workflows.map(w => 
+        w.id === updatedWorkflow.id ? updatedWorkflow : w
+      ),
     }));
   },
 
@@ -324,17 +374,23 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     const { currentWorkflow } = get();
     if (!currentWorkflow) return;
 
+    const updatedNodes = currentWorkflow.nodes.map((node) =>
+      node.id === id
+        ? { ...node, data: { ...node.data, active: !node.data.active } }
+        : node
+    );
+
+    const updatedWorkflow = {
+      ...currentWorkflow,
+      nodes: updatedNodes,
+      updatedAt: new Date().toISOString(),
+    };
+
     set((state) => ({
-      currentWorkflow: state.currentWorkflow
-        ? {
-            ...state.currentWorkflow,
-            nodes: state.currentWorkflow.nodes.map((node) =>
-              node.id === id
-                ? { ...node, data: { ...node.data, active: !node.data.active } }
-                : node
-            ),
-          }
-        : null,
+      currentWorkflow: updatedWorkflow,
+      workflows: state.workflows.map(w => 
+        w.id === updatedWorkflow.id ? updatedWorkflow : w
+      ),
     }));
   },
 
@@ -346,13 +402,17 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
 
     addToHistory(currentWorkflow.nodes, currentWorkflow.edges);
 
+    const updatedWorkflow = {
+      ...currentWorkflow,
+      edges: [...currentWorkflow.edges, edge],
+      updatedAt: new Date().toISOString(),
+    };
+
     set((state) => ({
-      currentWorkflow: state.currentWorkflow
-        ? {
-            ...state.currentWorkflow,
-            edges: [...state.currentWorkflow.edges, edge],
-          }
-        : null,
+      currentWorkflow: updatedWorkflow,
+      workflows: state.workflows.map(w => 
+        w.id === updatedWorkflow.id ? updatedWorkflow : w
+      ),
     }));
   },
 
@@ -362,13 +422,17 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
 
     addToHistory(currentWorkflow.nodes, currentWorkflow.edges);
 
+    const updatedWorkflow = {
+      ...currentWorkflow,
+      edges: currentWorkflow.edges.filter((edge) => edge.id !== id),
+      updatedAt: new Date().toISOString(),
+    };
+
     set((state) => ({
-      currentWorkflow: state.currentWorkflow
-        ? {
-            ...state.currentWorkflow,
-            edges: state.currentWorkflow.edges.filter((edge) => edge.id !== id),
-          }
-        : null,
+      currentWorkflow: updatedWorkflow,
+      workflows: state.workflows.map(w => 
+        w.id === updatedWorkflow.id ? updatedWorkflow : w
+      ),
     }));
   },
 
@@ -402,17 +466,15 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   },
 
   executeWorkflow: async (workflowId) => {
-    const { workflows, addLog } = get();
-    const workflow = workflows.find((w) => w.id === workflowId);
+    const { workflows, addLog, currentWorkflow } = get();
+    const workflow = workflows.find((w) => w.id === workflowId) || currentWorkflow;
     
     if (!workflow) {
-      toast.error('Workflow not found');
-      return;
+      throw new Error('Workflow not found');
     }
 
     if (workflow.nodes.length === 0) {
-      toast.error('Workflow has no nodes to execute');
-      return;
+      throw new Error('Workflow has no nodes to execute');
     }
 
     set({ isExecuting: true, executionProgress: 0 });
@@ -421,22 +483,39 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       const activeNodes = workflow.nodes.filter((node) => node.data.active);
       const totalNodes = activeNodes.length;
 
+      if (totalNodes === 0) {
+        throw new Error('No active nodes to execute');
+      }
+
+      // Update workflow status
+      const updatedWorkflow = {
+        ...workflow,
+        status: 'active' as const,
+        lastExecuted: new Date().toISOString(),
+      };
+
+      set((state) => ({
+        currentWorkflow: state.currentWorkflow?.id === workflow.id ? updatedWorkflow : state.currentWorkflow,
+        workflows: state.workflows.map(w => w.id === workflow.id ? updatedWorkflow : w),
+      }));
+
       for (let i = 0; i < activeNodes.length; i++) {
         const node = activeNodes[i];
         const startTime = Date.now();
 
-        // Update node status
+        // Update node status to running
+        const runningWorkflow = {
+          ...updatedWorkflow,
+          nodes: updatedWorkflow.nodes.map((n) =>
+            n.id === node.id
+              ? { ...n, data: { ...n.data, status: 'running' as const } }
+              : n
+          ),
+        };
+
         set((state) => ({
-          currentWorkflow: state.currentWorkflow
-            ? {
-                ...state.currentWorkflow,
-                nodes: state.currentWorkflow.nodes.map((n) =>
-                  n.id === node.id
-                    ? { ...n, data: { ...n.data, status: 'running' } }
-                    : n
-                ),
-              }
-            : null,
+          currentWorkflow: state.currentWorkflow?.id === workflow.id ? runningWorkflow : state.currentWorkflow,
+          workflows: state.workflows.map(w => w.id === workflow.id ? runningWorkflow : w),
         }));
 
         // Simulate node execution
@@ -446,25 +525,26 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
         const success = Math.random() > 0.1; // 90% success rate
 
         // Update node status
+        const completedWorkflow = {
+          ...runningWorkflow,
+          nodes: runningWorkflow.nodes.map((n) =>
+            n.id === node.id
+              ? {
+                  ...n,
+                  data: {
+                    ...n.data,
+                    status: success ? 'success' as const : 'error' as const,
+                    lastExecuted: new Date().toISOString(),
+                    executionTime,
+                  },
+                }
+              : n
+          ),
+        };
+
         set((state) => ({
-          currentWorkflow: state.currentWorkflow
-            ? {
-                ...state.currentWorkflow,
-                nodes: state.currentWorkflow.nodes.map((n) =>
-                  n.id === node.id
-                    ? {
-                        ...n,
-                        data: {
-                          ...n.data,
-                          status: success ? 'success' : 'error',
-                          lastExecuted: new Date().toISOString(),
-                          executionTime,
-                        },
-                      }
-                    : n
-                ),
-              }
-            : null,
+          currentWorkflow: state.currentWorkflow?.id === workflow.id ? completedWorkflow : state.currentWorkflow,
+          workflows: state.workflows.map(w => w.id === workflow.id ? completedWorkflow : w),
           executionProgress: ((i + 1) / totalNodes) * 100,
         }));
 
@@ -484,15 +564,26 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
         }
       }
 
-      toast.success('Workflow executed successfully!');
+      // Mark workflow as completed
+      const finalWorkflow = {
+        ...updatedWorkflow,
+        status: 'active' as const,
+        lastExecuted: new Date().toISOString(),
+      };
+
+      set((state) => ({
+        currentWorkflow: state.currentWorkflow?.id === workflow.id ? finalWorkflow : state.currentWorkflow,
+        workflows: state.workflows.map(w => w.id === workflow.id ? finalWorkflow : w),
+      }));
+
     } catch (error) {
-      toast.error(`Workflow execution failed: ${error}`);
       addLog({
         workflowId,
         nodeId: 'workflow',
         status: 'error',
         message: `Workflow execution failed: ${error}`,
       });
+      throw error;
     } finally {
       set({ isExecuting: false, executionProgress: 0 });
     }
@@ -500,17 +591,14 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
 
   pauseExecution: () => {
     set({ isExecuting: false });
-    toast.info('Workflow execution paused');
   },
 
   resumeExecution: () => {
     set({ isExecuting: true });
-    toast.info('Workflow execution resumed');
   },
 
   stopExecution: () => {
     set({ isExecuting: false, executionProgress: 0 });
-    toast.info('Workflow execution stopped');
   },
 
   addToHistory: (nodes, edges) => {
@@ -534,14 +622,18 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     const { history, historyIndex, currentWorkflow } = get();
     if (historyIndex > 0 && currentWorkflow) {
       const previousState = history[historyIndex - 1];
+      const updatedWorkflow = {
+        ...currentWorkflow,
+        nodes: previousState.nodes,
+        edges: previousState.edges,
+        updatedAt: new Date().toISOString(),
+      };
+      
       set((state) => ({
-        currentWorkflow: state.currentWorkflow
-          ? {
-              ...state.currentWorkflow,
-              nodes: previousState.nodes,
-              edges: previousState.edges,
-            }
-          : null,
+        currentWorkflow: updatedWorkflow,
+        workflows: state.workflows.map(w => 
+          w.id === updatedWorkflow.id ? updatedWorkflow : w
+        ),
         historyIndex: historyIndex - 1,
       }));
     }
@@ -551,14 +643,18 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     const { history, historyIndex, currentWorkflow } = get();
     if (historyIndex < history.length - 1 && currentWorkflow) {
       const nextState = history[historyIndex + 1];
+      const updatedWorkflow = {
+        ...currentWorkflow,
+        nodes: nextState.nodes,
+        edges: nextState.edges,
+        updatedAt: new Date().toISOString(),
+      };
+      
       set((state) => ({
-        currentWorkflow: state.currentWorkflow
-          ? {
-              ...state.currentWorkflow,
-              nodes: nextState.nodes,
-              edges: nextState.edges,
-            }
-          : null,
+        currentWorkflow: updatedWorkflow,
+        workflows: state.workflows.map(w => 
+          w.id === updatedWorkflow.id ? updatedWorkflow : w
+        ),
         historyIndex: historyIndex + 1,
       }));
     }
@@ -578,12 +674,12 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     set((state) => ({
       workflows: state.workflows.map((w) =>
         w.id === workflowId
-          ? { ...w, settings: { ...w.settings, ...settings } }
+          ? { ...w, settings: { ...w.settings, ...settings }, updatedAt: new Date().toISOString() }
           : w
       ),
       currentWorkflow:
         state.currentWorkflow?.id === workflowId
-          ? { ...state.currentWorkflow, settings: { ...state.currentWorkflow.settings, ...settings } }
+          ? { ...state.currentWorkflow, settings: { ...state.currentWorkflow.settings, ...settings }, updatedAt: new Date().toISOString() }
           : state.currentWorkflow,
     }));
   },
@@ -591,11 +687,11 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   resetSettings: (workflowId) => {
     set((state) => ({
       workflows: state.workflows.map((w) =>
-        w.id === workflowId ? { ...w, settings: { ...defaultSettings } } : w
+        w.id === workflowId ? { ...w, settings: { ...defaultSettings }, updatedAt: new Date().toISOString() } : w
       ),
       currentWorkflow:
         state.currentWorkflow?.id === workflowId
-          ? { ...state.currentWorkflow, settings: { ...defaultSettings } }
+          ? { ...state.currentWorkflow, settings: { ...defaultSettings }, updatedAt: new Date().toISOString() }
           : state.currentWorkflow,
     }));
   },
@@ -603,7 +699,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   addLog: (log) => {
     const newLog: ExecutionLog = {
       ...log,
-      id: `log-${Date.now()}-${Math.random()}`,
+      id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       timestamp: new Date().toISOString(),
     };
 
