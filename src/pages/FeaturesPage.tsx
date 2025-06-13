@@ -37,7 +37,8 @@ import {
   Cloud,
   Smartphone,
   Monitor,
-  Headphones
+  Headphones,
+  CheckCircle
 } from 'lucide-react';
 
 const FeatureSection = ({ 
