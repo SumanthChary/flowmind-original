@@ -31,20 +31,28 @@ import {
   Eye,
   EyeOff,
   Menu,
-  X
+  X,
+  Zap,
+  Globe,
+  Sparkles,
+  Brain,
+  Settings,
+  BarChart,
+  Pause,
+  Square,
+  RotateCcw,
+  RotateCw
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-// Custom Node Components
 import TriggerNode from './nodes/TriggerNode';
 import ActionNode from './nodes/ActionNode';
 import ConditionNode from './nodes/ConditionNode';
 import DelayNode from './nodes/DelayNode';
 
-// Store
 import { useWorkflowStore } from '../../store/workflowStore';
+import AgentBuilder from './AgentBuilder';
 
-// Node types mapping
 const nodeTypes: NodeTypes = {
   trigger: TriggerNode,
   action: ActionNode,
@@ -52,7 +60,6 @@ const nodeTypes: NodeTypes = {
   delay: DelayNode,
 };
 
-// Node templates
 const nodeTemplates = [
   {
     id: 'email-trigger',
@@ -68,6 +75,14 @@ const nodeTemplates = [
     label: 'Webhook',
     icon: <Webhook size={20} />,
     description: 'Trigger via HTTP webhook',
+    category: 'Triggers'
+  },
+  {
+    id: 'schedule-trigger',
+    type: 'trigger',
+    label: 'Schedule',
+    icon: <Timer size={20} />,
+    description: 'Trigger on schedule',
     category: 'Triggers'
   },
   {
@@ -87,6 +102,38 @@ const nodeTemplates = [
     category: 'Actions'
   },
   {
+    id: 'slack-action',
+    type: 'action',
+    label: 'Send Slack Message',
+    icon: <MessageSquare size={20} />,
+    description: 'Send message to Slack',
+    category: 'Actions'
+  },
+  {
+    id: 'database-action',
+    type: 'action',
+    label: 'Update Database',
+    icon: <Database size={20} />,
+    description: 'Update database record',
+    category: 'Actions'
+  },
+  {
+    id: 'api-action',
+    type: 'action',
+    label: 'API Call',
+    icon: <Globe size={20} />,
+    description: 'Make HTTP API request',
+    category: 'Actions'
+  },
+  {
+    id: 'ai-action',
+    type: 'ai',
+    label: 'AI Processing',
+    icon: <Brain size={20} />,
+    description: 'AI analysis and processing',
+    category: 'AI'
+  },
+  {
     id: 'if-condition',
     type: 'condition',
     label: 'If/Then',
@@ -100,7 +147,7 @@ const nodeTemplates = [
     label: 'Delay',
     icon: <Timer size={20} />,
     description: 'Wait for specified time',
-    category: 'Utilities'
+    category: 'Logic'
   }
 ];
 
@@ -110,14 +157,33 @@ interface EnhancedWorkflowBuilderProps {
 }
 
 const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflowBuilderProps) => {
-  const { nodes, edges, setNodes, setEdges, addNode, addEdge: addWorkflowEdge } = useWorkflowStore();
+  const { 
+    nodes, 
+    edges, 
+    setNodes, 
+    setEdges, 
+    addNode, 
+    addEdge: addWorkflowEdge,
+    currentWorkflow,
+    isExecuting,
+    executionProgress,
+    executeWorkflow,
+    pauseExecution,
+    stopExecution,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    saveWorkflow
+  } = useWorkflowStore();
+  
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
   const [draggedTemplate, setDraggedTemplate] = useState<typeof nodeTemplates[0] | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [showAgentBuilder, setShowAgentBuilder] = useState(false);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
 
-  // Check if mobile
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 1024);
@@ -138,6 +204,7 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
         id: `edge-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         type: 'smoothstep',
         animated: true,
+        data: { status: 'idle' }
       };
       setEdges(addEdge(newEdge, edges));
       addWorkflowEdge(newEdge);
@@ -194,14 +261,24 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
   };
 
   const handleSave = () => {
-    if (!reactFlowInstance) return;
+    if (!reactFlowInstance || !currentWorkflow) return;
     
     const flow = reactFlowInstance.toObject();
-    onSave?.({
+    const updatedWorkflow = {
+      ...currentWorkflow,
       nodes: flow.nodes,
       edges: flow.edges,
       viewport: flow.viewport,
-    });
+    };
+    
+    saveWorkflow(updatedWorkflow);
+    onSave?.(updatedWorkflow);
+    toast.success('Workflow saved!');
+  };
+
+  const handleRun = async () => {
+    if (!currentWorkflow) return;
+    await executeWorkflow(currentWorkflow.id);
   };
 
   const groupedTemplates = nodeTemplates.reduce((acc, template) => {
@@ -211,6 +288,23 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
     acc[template.category].push(template);
     return acc;
   }, {} as Record<string, typeof nodeTemplates>);
+
+  if (showAgentBuilder) {
+    return (
+      <div className="h-full">
+        <div className="bg-white border-b border-gray-200 p-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold">AI Agent Builder</h2>
+          <button
+            onClick={() => setShowAgentBuilder(false)}
+            className="text-gray-600 hover:text-gray-900"
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <AgentBuilder />
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex bg-gray-50">
@@ -239,7 +333,15 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
 
             {/* Actions */}
             <div className="p-4 border-b border-gray-200">
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <button
+                  onClick={handleRun}
+                  disabled={isExecuting || !nodes.length}
+                  className="flex items-center justify-center px-3 py-2 bg-success-600 text-white rounded-lg hover:bg-success-700 transition-colors disabled:opacity-50 text-sm"
+                >
+                  {isExecuting ? <Pause size={16} className="mr-1" /> : <Play size={16} className="mr-1" />}
+                  {isExecuting ? 'Running...' : 'Run'}
+                </button>
                 <button
                   onClick={handleSave}
                   className="flex items-center justify-center px-3 py-2 bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-colors text-sm"
@@ -247,11 +349,50 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
                   <Save size={16} className="mr-1" />
                   Save
                 </button>
-                <button className="flex items-center justify-center px-3 py-2 bg-success-600 text-white rounded-lg hover:bg-success-700 transition-colors text-sm">
-                  <Play size={16} className="mr-1" />
-                  Run
-                </button>
               </div>
+              
+              {isExecuting ? (
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={pauseExecution}
+                    className="flex items-center justify-center px-2 py-2 bg-warning-600 text-white rounded-lg hover:bg-warning-700 transition-colors text-sm"
+                  >
+                    <Pause size={16} />
+                  </button>
+                  <button
+                    onClick={stopExecution}
+                    className="flex items-center justify-center px-2 py-2 bg-error-600 text-white rounded-lg hover:bg-error-700 transition-colors text-sm"
+                  >
+                    <Square size={16} />
+                  </button>
+                  <div className="flex items-center justify-center px-2 py-2 bg-gray-100 rounded-lg text-sm">
+                    {Math.round(executionProgress)}%
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={undo}
+                    disabled={!canUndo()}
+                    className="flex items-center justify-center px-2 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 text-sm"
+                  >
+                    <RotateCcw size={16} />
+                  </button>
+                  <button
+                    onClick={redo}
+                    disabled={!canRedo()}
+                    className="flex items-center justify-center px-2 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 text-sm"
+                  >
+                    <RotateCw size={16} />
+                  </button>
+                  <button
+                    onClick={() => setShowAgentBuilder(true)}
+                    className="flex items-center justify-center px-2 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm"
+                  >
+                    <Bot size={16} />
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Node Templates */}
@@ -262,7 +403,7 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
                     {category}
                   </h3>
                   <div className="space-y-2">
-                    {templates.map((template) => (
+                    {templates.map((template, index) => (
                       <motion.div
                         key={template.id}
                         className="p-3 bg-white border border-gray-200 rounded-lg cursor-grab hover:border-accent-300 hover:shadow-sm transition-all"
@@ -315,8 +456,21 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
               <span className="text-sm text-gray-600">
                 {nodes.length} nodes, {edges.length} connections
               </span>
+              {isExecuting && (
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-success-500 rounded-full animate-pulse"></div>
+                  <span className="text-sm text-success-600">Executing... {Math.round(executionProgress)}%</span>
+                </div>
+              )}
             </div>
             <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setShowAgentBuilder(true)}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm flex items-center"
+              >
+                <Bot size={16} className="mr-2" />
+                AI Agent
+              </button>
               <button
                 onClick={handleSave}
                 className="px-4 py-2 bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-colors text-sm"
