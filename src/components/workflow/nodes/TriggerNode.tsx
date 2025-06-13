@@ -1,7 +1,31 @@
 import { Handle, Position, NodeProps } from 'reactflow';
 import { motion } from 'framer-motion';
-import { Zap, Power, PowerOff, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { 
+  Zap, 
+  Power, 
+  PowerOff, 
+  AlertCircle, 
+  CheckCircle, 
+  Clock,
+  Mail,
+  Webhook,
+  Timer,
+  Calendar,
+  Database,
+  Settings
+} from 'lucide-react';
 import { WorkflowNode } from '../../../store/workflowStore';
+
+// Icon mapping for TriggerNode
+const iconMap: Record<string, React.ReactNode> = {
+  Zap: <Zap size={18} />,
+  Mail: <Mail size={18} />,
+  Webhook: <Webhook size={18} />,
+  Timer: <Timer size={18} />,
+  Calendar: <Calendar size={18} />,
+  Database: <Database size={18} />,
+  Settings: <Settings size={18} />,
+};
 
 const TriggerNode = ({ data, selected }: NodeProps<WorkflowNode['data']>) => {
   const getStatusIndicator = () => {
@@ -17,12 +41,13 @@ const TriggerNode = ({ data, selected }: NodeProps<WorkflowNode['data']>) => {
     }
   };
 
-  // Safe icon rendering - convert string to component or use default
+  // Safe icon rendering using string identifier
   const renderIcon = () => {
     if (typeof data.icon === 'string') {
-      return <Zap size={18} />;
+      return iconMap[data.icon] || <Zap size={18} />;
     }
-    return data.icon || <Zap size={18} />;
+    // Fallback for legacy data that might still have React components
+    return <Zap size={18} />;
   };
 
   return (

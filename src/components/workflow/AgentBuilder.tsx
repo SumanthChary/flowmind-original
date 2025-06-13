@@ -40,11 +40,11 @@ const AgentBuilder: React.FC = () => {
       description: 'Handles customer inquiries, tickets, and support requests automatically',
       icon: <MessageSquare size={24} className="text-blue-600" />,
       nodes: [
-        { type: 'trigger', label: 'Email Received', config: { triggerType: 'email' } },
-        { type: 'ai', label: 'Analyze Intent', config: { aiType: 'text_analysis' } },
-        { type: 'condition', label: 'Check Priority', config: { field: 'priority', value: 'high' } },
-        { type: 'action', label: 'Send Response', config: { actionType: 'email' } },
-        { type: 'action', label: 'Create Ticket', config: { actionType: 'database' } }
+        { type: 'trigger', label: 'Email Received', config: { triggerType: 'email' }, icon: 'Mail' },
+        { type: 'ai', label: 'Analyze Intent', config: { aiType: 'text_analysis' }, icon: 'Brain' },
+        { type: 'condition', label: 'Check Priority', config: { field: 'priority', value: 'high' }, icon: 'Filter' },
+        { type: 'action', label: 'Send Response', config: { actionType: 'email' }, icon: 'Mail' },
+        { type: 'action', label: 'Create Ticket', config: { actionType: 'database' }, icon: 'Database' }
       ]
     },
     {
@@ -53,11 +53,11 @@ const AgentBuilder: React.FC = () => {
       description: 'Processes, transforms, and analyzes data from multiple sources',
       icon: <Database size={24} className="text-green-600" />,
       nodes: [
-        { type: 'trigger', label: 'Data Webhook', config: { triggerType: 'webhook' } },
-        { type: 'data', label: 'Clean Data', config: { transformType: 'filter' } },
-        { type: 'ai', label: 'Extract Insights', config: { aiType: 'data_extraction' } },
-        { type: 'action', label: 'Store Results', config: { actionType: 'database' } },
-        { type: 'action', label: 'Send Report', config: { actionType: 'email' } }
+        { type: 'trigger', label: 'Data Webhook', config: { triggerType: 'webhook' }, icon: 'Webhook' },
+        { type: 'data', label: 'Clean Data', config: { transformType: 'filter' }, icon: 'Filter' },
+        { type: 'ai', label: 'Extract Insights', config: { aiType: 'data_extraction' }, icon: 'Brain' },
+        { type: 'action', label: 'Store Results', config: { actionType: 'database' }, icon: 'Database' },
+        { type: 'action', label: 'Send Report', config: { actionType: 'email' }, icon: 'Mail' }
       ]
     },
     {
@@ -66,11 +66,11 @@ const AgentBuilder: React.FC = () => {
       description: 'Generates, reviews, and publishes content across platforms',
       icon: <FileText size={24} className="text-purple-600" />,
       nodes: [
-        { type: 'trigger', label: 'Schedule Trigger', config: { triggerType: 'schedule' } },
-        { type: 'ai', label: 'Generate Content', config: { aiType: 'content_generation' } },
-        { type: 'ai', label: 'Review Quality', config: { aiType: 'text_analysis' } },
-        { type: 'condition', label: 'Quality Check', config: { field: 'quality_score', value: '80' } },
-        { type: 'action', label: 'Publish Content', config: { actionType: 'api' } }
+        { type: 'trigger', label: 'Schedule Trigger', config: { triggerType: 'schedule' }, icon: 'Timer' },
+        { type: 'ai', label: 'Generate Content', config: { aiType: 'content_generation' }, icon: 'Brain' },
+        { type: 'ai', label: 'Review Quality', config: { aiType: 'text_analysis' }, icon: 'Brain' },
+        { type: 'condition', label: 'Quality Check', config: { field: 'quality_score', value: '80' }, icon: 'Filter' },
+        { type: 'action', label: 'Publish Content', config: { actionType: 'api' }, icon: 'Globe' }
       ]
     },
     {
@@ -79,12 +79,12 @@ const AgentBuilder: React.FC = () => {
       description: 'Manages leads, follows up with prospects, and tracks sales pipeline',
       icon: <Target size={24} className="text-orange-600" />,
       nodes: [
-        { type: 'trigger', label: 'New Lead', config: { triggerType: 'webhook' } },
-        { type: 'ai', label: 'Score Lead', config: { aiType: 'data_extraction' } },
-        { type: 'condition', label: 'High Value Lead', config: { field: 'score', value: '75' } },
-        { type: 'action', label: 'Assign to Sales', config: { actionType: 'slack' } },
-        { type: 'delay', label: 'Wait 2 Days', config: { duration: 2, unit: 'days' } },
-        { type: 'action', label: 'Follow Up Email', config: { actionType: 'email' } }
+        { type: 'trigger', label: 'New Lead', config: { triggerType: 'webhook' }, icon: 'Webhook' },
+        { type: 'ai', label: 'Score Lead', config: { aiType: 'data_extraction' }, icon: 'Brain' },
+        { type: 'condition', label: 'High Value Lead', config: { field: 'score', value: '75' }, icon: 'Filter' },
+        { type: 'action', label: 'Assign to Sales', config: { actionType: 'slack' }, icon: 'MessageSquare' },
+        { type: 'delay', label: 'Wait 2 Days', config: { duration: 2, unit: 'days' }, icon: 'Timer' },
+        { type: 'action', label: 'Follow Up Email', config: { actionType: 'email' }, icon: 'Mail' }
       ]
     },
     {
@@ -93,11 +93,11 @@ const AgentBuilder: React.FC = () => {
       description: 'Monitors systems, detects issues, and alerts the team',
       icon: <Shield size={24} className="text-red-600" />,
       nodes: [
-        { type: 'trigger', label: 'Health Check', config: { triggerType: 'schedule' } },
-        { type: 'webhook', label: 'Check APIs', config: { method: 'GET' } },
-        { type: 'condition', label: 'System Healthy', config: { field: 'status_code', value: '200' } },
-        { type: 'action', label: 'Alert Team', config: { actionType: 'slack' } },
-        { type: 'action', label: 'Create Incident', config: { actionType: 'database' } }
+        { type: 'trigger', label: 'Health Check', config: { triggerType: 'schedule' }, icon: 'Timer' },
+        { type: 'webhook', label: 'Check APIs', config: { method: 'GET' }, icon: 'Webhook' },
+        { type: 'condition', label: 'System Healthy', config: { field: 'status_code', value: '200' }, icon: 'Filter' },
+        { type: 'action', label: 'Alert Team', config: { actionType: 'slack' }, icon: 'MessageSquare' },
+        { type: 'action', label: 'Create Incident', config: { actionType: 'database' }, icon: 'Database' }
       ]
     },
     {
@@ -137,6 +137,7 @@ const AgentBuilder: React.FC = () => {
           data: {
             label: nodeTemplate.label,
             type: nodeTemplate.type,
+            icon: nodeTemplate.icon, // Store as string identifier
             config: nodeTemplate.config,
             active: true,
             status: 'idle' as const
@@ -198,6 +199,7 @@ const AgentBuilder: React.FC = () => {
         data: {
           label: 'Demo Trigger',
           type: 'trigger',
+          icon: 'Zap', // Store as string identifier
           config: { triggerType: 'manual' },
           active: true,
           status: 'idle'
@@ -211,6 +213,7 @@ const AgentBuilder: React.FC = () => {
         data: {
           label: 'AI Processing',
           type: 'ai',
+          icon: 'Brain', // Store as string identifier
           config: { aiType: 'text_analysis' },
           active: true,
           status: 'idle'
@@ -224,6 +227,7 @@ const AgentBuilder: React.FC = () => {
         data: {
           label: 'Complete Task',
           type: 'action',
+          icon: 'Mail', // Store as string identifier
           config: { actionType: 'email' },
           active: true,
           status: 'idle'

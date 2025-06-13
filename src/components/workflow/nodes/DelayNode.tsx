@@ -1,7 +1,24 @@
 import { Handle, Position, NodeProps } from 'reactflow';
 import { motion } from 'framer-motion';
-import { Clock, Power, PowerOff, AlertCircle, CheckCircle } from 'lucide-react';
+import { 
+  Clock, 
+  Power, 
+  PowerOff, 
+  AlertCircle, 
+  CheckCircle,
+  Timer,
+  Pause,
+  Settings
+} from 'lucide-react';
 import { WorkflowNode } from '../../../store/workflowStore';
+
+// Icon mapping for DelayNode
+const iconMap: Record<string, React.ReactNode> = {
+  Clock: <Clock size={18} />,
+  Timer: <Timer size={18} />,
+  Pause: <Pause size={18} />,
+  Settings: <Settings size={18} />,
+};
 
 const DelayNode = ({ data, selected }: NodeProps<WorkflowNode['data']>) => {
   const getStatusIndicator = () => {
@@ -17,12 +34,13 @@ const DelayNode = ({ data, selected }: NodeProps<WorkflowNode['data']>) => {
     }
   };
 
-  // Safe icon rendering - convert string to component or use default
+  // Safe icon rendering using string identifier
   const renderIcon = () => {
     if (typeof data.icon === 'string') {
-      return <Clock size={18} />;
+      return iconMap[data.icon] || <Clock size={18} />;
     }
-    return data.icon || <Clock size={18} />;
+    // Fallback for legacy data that might still have React components
+    return <Clock size={18} />;
   };
 
   const getDurationText = () => {

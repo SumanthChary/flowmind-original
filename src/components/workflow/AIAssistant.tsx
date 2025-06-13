@@ -143,7 +143,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ isOpen, onClose }) => {
       position: { x: 100, y: 100 },
       data: {
         label: 'Email Received',
-        icon: <Mail size={18} />,
+        icon: 'Mail', // Store as string identifier
         type: 'trigger',
         config: { triggerType: 'email', emailFilter: 'support@company.com' },
         active: true,
@@ -157,7 +157,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ isOpen, onClose }) => {
       position: { x: 350, y: 100 },
       data: {
         label: 'AI Analysis',
-        icon: <Brain size={18} />,
+        icon: 'Brain', // Store as string identifier
         type: 'ai',
         config: { aiType: 'text_analysis' },
         active: true,
@@ -171,7 +171,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ isOpen, onClose }) => {
       position: { x: 600, y: 100 },
       data: {
         label: 'Check Urgency',
-        icon: <Filter size={18} />,
+        icon: 'Filter', // Store as string identifier
         type: 'condition',
         config: { conditionType: 'contains', field: 'sentiment', value: 'urgent' },
         active: true,
@@ -185,7 +185,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ isOpen, onClose }) => {
       position: { x: 850, y: 100 },
       data: {
         label: 'Send Response',
-        icon: <Mail size={18} />,
+        icon: 'Mail', // Store as string identifier
         type: 'action',
         config: { actionType: 'email' },
         active: true,
@@ -268,7 +268,7 @@ ${workflowAnalysis.suggestions.map(s => `• ${s}`).join('\n')}`,
                 position: { x: 100, y: 100 },
                 data: {
                   label: 'Email Trigger',
-                  icon: <Mail size={18} />,
+                  icon: 'Mail', // Store as string identifier
                   type: 'trigger',
                   config: { triggerType: 'email' },
                   active: true,
@@ -356,7 +356,7 @@ Let me help you create an email automation system:
                 position: { x: 100, y: 100 },
                 data: {
                   label: 'Email Received',
-                  icon: <Mail size={18} />,
+                  icon: 'Mail', // Store as string identifier
                   type: 'trigger',
                   config: { triggerType: 'email' },
                   active: true,

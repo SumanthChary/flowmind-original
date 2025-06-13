@@ -1,7 +1,39 @@
 import { Handle, Position, NodeProps } from 'reactflow';
 import { motion } from 'framer-motion';
-import { Play, Power, PowerOff, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { 
+  Play, 
+  Power, 
+  PowerOff, 
+  AlertCircle, 
+  CheckCircle, 
+  Clock,
+  Mail,
+  Calendar,
+  MessageSquare,
+  Database,
+  Globe,
+  Brain,
+  Code,
+  Webhook,
+  FileText,
+  Settings
+} from 'lucide-react';
 import { WorkflowNode } from '../../../store/workflowStore';
+
+// Icon mapping for ActionNode
+const iconMap: Record<string, React.ReactNode> = {
+  Mail: <Mail size={18} />,
+  Calendar: <Calendar size={18} />,
+  MessageSquare: <MessageSquare size={18} />,
+  Database: <Database size={18} />,
+  Globe: <Globe size={18} />,
+  Brain: <Brain size={18} />,
+  Code: <Code size={18} />,
+  Webhook: <Webhook size={18} />,
+  FileText: <FileText size={18} />,
+  Settings: <Settings size={18} />,
+  Play: <Play size={18} />,
+};
 
 const ActionNode = ({ data, selected }: NodeProps<WorkflowNode['data']>) => {
   const getStatusIndicator = () => {
@@ -17,12 +49,13 @@ const ActionNode = ({ data, selected }: NodeProps<WorkflowNode['data']>) => {
     }
   };
 
-  // Safe icon rendering - convert string to component or use default
+  // Safe icon rendering using string identifier
   const renderIcon = () => {
     if (typeof data.icon === 'string') {
-      return <Play size={18} />;
+      return iconMap[data.icon] || <Play size={18} />;
     }
-    return data.icon || <Play size={18} />;
+    // Fallback for legacy data that might still have React components
+    return <Play size={18} />;
   };
 
   return (

@@ -1,7 +1,25 @@
 import { Handle, Position, NodeProps } from 'reactflow';
 import { motion } from 'framer-motion';
-import { GitBranch, Power, PowerOff, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { 
+  GitBranch, 
+  Power, 
+  PowerOff, 
+  AlertCircle, 
+  CheckCircle, 
+  Clock,
+  Filter,
+  Code,
+  Settings
+} from 'lucide-react';
 import { WorkflowNode } from '../../../store/workflowStore';
+
+// Icon mapping for ConditionNode
+const iconMap: Record<string, React.ReactNode> = {
+  Filter: <Filter size={18} />,
+  GitBranch: <GitBranch size={18} />,
+  Code: <Code size={18} />,
+  Settings: <Settings size={18} />,
+};
 
 const ConditionNode = ({ data, selected }: NodeProps<WorkflowNode['data']>) => {
   const getStatusIndicator = () => {
@@ -17,12 +35,13 @@ const ConditionNode = ({ data, selected }: NodeProps<WorkflowNode['data']>) => {
     }
   };
 
-  // Safe icon rendering - convert string to component or use default
+  // Safe icon rendering using string identifier
   const renderIcon = () => {
     if (typeof data.icon === 'string') {
-      return <GitBranch size={18} />;
+      return iconMap[data.icon] || <GitBranch size={18} />;
     }
-    return data.icon || <GitBranch size={18} />;
+    // Fallback for legacy data that might still have React components
+    return <GitBranch size={18} />;
   };
 
   return (

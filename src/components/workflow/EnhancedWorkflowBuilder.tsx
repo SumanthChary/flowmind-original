@@ -65,7 +65,7 @@ const nodeTemplates = [
     id: 'email-trigger',
     type: 'trigger',
     label: 'Email Trigger',
-    icon: <Mail size={20} />,
+    icon: 'Mail',
     description: 'Trigger when email is received',
     category: 'Triggers'
   },
@@ -73,7 +73,7 @@ const nodeTemplates = [
     id: 'webhook-trigger',
     type: 'trigger',
     label: 'Webhook',
-    icon: <Webhook size={20} />,
+    icon: 'Webhook',
     description: 'Trigger via HTTP webhook',
     category: 'Triggers'
   },
@@ -81,7 +81,7 @@ const nodeTemplates = [
     id: 'schedule-trigger',
     type: 'trigger',
     label: 'Schedule',
-    icon: <Timer size={20} />,
+    icon: 'Timer',
     description: 'Trigger on schedule',
     category: 'Triggers'
   },
@@ -89,7 +89,7 @@ const nodeTemplates = [
     id: 'send-email-action',
     type: 'action',
     label: 'Send Email',
-    icon: <Mail size={20} />,
+    icon: 'Mail',
     description: 'Send an email message',
     category: 'Actions'
   },
@@ -97,7 +97,7 @@ const nodeTemplates = [
     id: 'calendar-action',
     type: 'action',
     label: 'Create Calendar Event',
-    icon: <Calendar size={20} />,
+    icon: 'Calendar',
     description: 'Create a calendar event',
     category: 'Actions'
   },
@@ -105,7 +105,7 @@ const nodeTemplates = [
     id: 'slack-action',
     type: 'action',
     label: 'Send Slack Message',
-    icon: <MessageSquare size={20} />,
+    icon: 'MessageSquare',
     description: 'Send message to Slack',
     category: 'Actions'
   },
@@ -113,7 +113,7 @@ const nodeTemplates = [
     id: 'database-action',
     type: 'action',
     label: 'Update Database',
-    icon: <Database size={20} />,
+    icon: 'Database',
     description: 'Update database record',
     category: 'Actions'
   },
@@ -121,7 +121,7 @@ const nodeTemplates = [
     id: 'api-action',
     type: 'action',
     label: 'API Call',
-    icon: <Globe size={20} />,
+    icon: 'Globe',
     description: 'Make HTTP API request',
     category: 'Actions'
   },
@@ -129,7 +129,7 @@ const nodeTemplates = [
     id: 'ai-action',
     type: 'ai',
     label: 'AI Processing',
-    icon: <Brain size={20} />,
+    icon: 'Brain',
     description: 'AI analysis and processing',
     category: 'AI'
   },
@@ -137,7 +137,7 @@ const nodeTemplates = [
     id: 'if-condition',
     type: 'condition',
     label: 'If/Then',
-    icon: <Filter size={20} />,
+    icon: 'Filter',
     description: 'Conditional logic',
     category: 'Logic'
   },
@@ -145,11 +145,24 @@ const nodeTemplates = [
     id: 'delay-timer',
     type: 'delay',
     label: 'Delay',
-    icon: <Timer size={20} />,
+    icon: 'Timer',
     description: 'Wait for specified time',
     category: 'Logic'
   }
 ];
+
+// Icon mapping for template display
+const iconMap: Record<string, React.ReactNode> = {
+  Mail: <Mail size={20} />,
+  Webhook: <Webhook size={20} />,
+  Timer: <Timer size={20} />,
+  Calendar: <Calendar size={20} />,
+  MessageSquare: <MessageSquare size={20} />,
+  Database: <Database size={20} />,
+  Globe: <Globe size={20} />,
+  Brain: <Brain size={20} />,
+  Filter: <Filter size={20} />,
+};
 
 interface EnhancedWorkflowBuilderProps {
   workflowId?: string;
@@ -239,7 +252,7 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
         position,
         data: {
           label: draggedTemplate.label,
-          icon: draggedTemplate.icon,
+          icon: draggedTemplate.icon, // Store as string identifier
           type: draggedTemplate.type,
           config: {},
           active: true,
@@ -414,7 +427,7 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
                       >
                         <div className="flex items-center mb-2">
                           <div className="text-accent-600 mr-2">
-                            {template.icon}
+                            {iconMap[template.icon] || <Bot size={20} />}
                           </div>
                           <span className="font-medium text-gray-900 text-sm">
                             {template.label}
