@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Menu, X } from 'lucide-react';
+import { ArrowLeft, Menu, X, Bot, MessageSquare } from 'lucide-react';
 import EnhancedWorkflowBuilder from '../components/workflow/EnhancedWorkflowBuilder';
+import AIAssistant from '../components/workflow/AIAssistant';
 import { useWorkflowStore } from '../store/workflowStore';
 import toast from 'react-hot-toast';
 
@@ -10,6 +11,7 @@ const WorkflowBuilderPage = () => {
   const [searchParams] = useSearchParams();
   const workflowId = searchParams.get('id');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showAIAssistant, setShowAIAssistant] = useState(false);
   
   const { 
     currentWorkflow, 
@@ -25,9 +27,9 @@ const WorkflowBuilderPage = () => {
       loadWorkflow(workflowId);
     } else if (!currentWorkflow) {
       const initWorkflow = async () => {
-        const newId = await createWorkflow('Untitled Workflow', 'A new automation workflow');
-        if (newId) {
-          navigate(`/workflow-builder?id=${newId}`, { replace: true });
+        const newWorkflow = createWorkflow('Untitled Workflow', 'A new automation workflow');
+        if (newWorkflow) {
+          navigate(`/workflow-builder?id=${newWorkflow.id}`, { replace: true });
         }
       };
       initWorkflow();
@@ -58,9 +60,9 @@ const WorkflowBuilderPage = () => {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
       {/* Mobile Header */}
-      <div className="lg:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+      <div className="lg:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between flex-shrink-0">
         <button
           onClick={() => navigate('/dashboard')}
           className="flex items-center text-gray-600 hover:text-accent-600 transition-colors"
@@ -73,16 +75,28 @@ const WorkflowBuilderPage = () => {
           {currentWorkflow.name}
         </h1>
         
-        <button
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-        >
-          {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setShowAIAssistant(!showAIAssistant)}
+            className={`p-2 rounded-lg transition-colors ${
+              showAIAssistant 
+                ? 'bg-accent-100 text-accent-600' 
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+            }`}
+          >
+            <Bot size={20} />
+          </button>
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </div>
       </div>
 
       {/* Desktop Header */}
-      <div className="hidden lg:flex bg-white border-b border-gray-200 px-6 py-4 items-center justify-between">
+      <div className="hidden lg:flex bg-white border-b border-gray-200 px-6 py-4 items-center justify-between flex-shrink-0">
         <div className="flex items-center space-x-4">
           <button
             onClick={() => navigate('/dashboard')}
@@ -104,7 +118,19 @@ const WorkflowBuilderPage = () => {
           </div>
         </div>
         
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={() => setShowAIAssistant(!showAIAssistant)}
+            className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors ${
+              showAIAssistant
+                ? 'bg-accent-600 text-white'
+                : 'bg-accent-100 text-accent-600 hover:bg-accent-200'
+            }`}
+          >
+            <Bot size={18} className="mr-2" />
+            AI Assistant
+          </button>
+          
           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
             currentWorkflow.status === 'active' ? 'bg-success-100 text-success-700' :
             currentWorkflow.status === 'paused' ? 'bg-warning-100 text-warning-700' :
@@ -119,7 +145,7 @@ const WorkflowBuilderPage = () => {
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
         <div className="lg:hidden fixed inset-0 z-50 bg-black bg-opacity-50" onClick={() => setIsMobileMenuOpen(false)}>
-          <div className="absolute top-0 right-0 w-64 h-full bg-white shadow-xl p-4">
+          <div className="absolute top-0 right-0 w-64 h-full bg-white shadow-xl p-4 overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold">Workflow Info</h2>
               <button onClick={() => setIsMobileMenuOpen(false)}>
@@ -144,16 +170,36 @@ const WorkflowBuilderPage = () => {
                   {currentWorkflow.description || 'No description'}
                 </p>
               </div>
+              <button
+                onClick={() => {
+                  setShowAIAssistant(!showAIAssistant);
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`w-full flex items-center justify-center px-4 py-2 rounded-lg font-medium transition-colors ${
+                  showAIAssistant
+                    ? 'bg-accent-600 text-white'
+                    : 'bg-accent-100 text-accent-600'
+                }`}
+              >
+                <Bot size={18} className="mr-2" />
+                {showAIAssistant ? 'Hide' : 'Show'} AI Assistant
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {/* Enhanced Workflow Builder */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden relative">
         <EnhancedWorkflowBuilder 
           workflowId={currentWorkflow.id}
           onSave={handleSave} 
+        />
+        
+        {/* AI Assistant */}
+        <AIAssistant 
+          isOpen={showAIAssistant}
+          onClose={() => setShowAIAssistant(false)}
         />
       </div>
     </div>
