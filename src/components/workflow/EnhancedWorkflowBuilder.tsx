@@ -49,6 +49,7 @@ import TriggerNode from './nodes/TriggerNode';
 import ActionNode from './nodes/ActionNode';
 import ConditionNode from './nodes/ConditionNode';
 import DelayNode from './nodes/DelayNode';
+import NodeInspector from './NodeInspector';
 
 import { useWorkflowStore } from '../../store/workflowStore';
 import AgentBuilder from './AgentBuilder';
@@ -187,7 +188,9 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
     redo,
     canUndo,
     canRedo,
-    saveWorkflow
+    saveWorkflow,
+    selectedNodeId,
+    setSelectedNode
   } = useWorkflowStore();
   
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
@@ -195,6 +198,7 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [showAgentBuilder, setShowAgentBuilder] = useState(false);
+  const [showNodeInspector, setShowNodeInspector] = useState(false);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -209,6 +213,9 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Get selected node for inspector
+  const selectedNode = selectedNodeId ? nodes.find(n => n.id === selectedNodeId) : null;
 
   const onConnect = useCallback(
     (params: Connection) => {
@@ -228,6 +235,16 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
   const onInit = (instance: ReactFlowInstance) => {
     setReactFlowInstance(instance);
   };
+
+  const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+    setSelectedNode(node.id);
+    setShowNodeInspector(true);
+  }, [setSelectedNode]);
+
+  const onPaneClick = useCallback(() => {
+    setSelectedNode(null);
+    setShowNodeInspector(false);
+  }, [setSelectedNode]);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -409,7 +426,7 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
             </div>
 
             {/* Node Templates */}
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
               {Object.entries(groupedTemplates).map(([category, templates]) => (
                 <div key={category} className="mb-6">
                   <h3 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">
@@ -510,6 +527,8 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
             onInit={onInit}
             onDrop={onDrop}
             onDragOver={onDragOver}
+            onNodeClick={onNodeClick}
+            onPaneClick={onPaneClick}
             nodeTypes={nodeTypes}
             fitView
             className="bg-gray-50"
@@ -529,6 +548,16 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
           </ReactFlow>
         </div>
       </div>
+
+      {/* Node Inspector */}
+      <NodeInspector
+        node={selectedNode}
+        isOpen={showNodeInspector}
+        onClose={() => {
+          setShowNodeInspector(false);
+          setSelectedNode(null);
+        }}
+      />
     </div>
   );
 };

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase, testConnection } from '../lib/supabase';
 import { geminiService } from '../services/geminiService';
+import { emailService } from '../services/emailService';
 
 export interface WorkflowNode {
   id: string;
@@ -120,7 +121,7 @@ interface WorkflowState {
   clearLogs: (workflowId: string) => void;
 }
 
-// Enhanced AI Agent for workflow execution with Gemini integration
+// Enhanced AI Agent for workflow execution with Gemini integration and real email sending
 class WorkflowAgent {
   async executeNode(node: WorkflowNode, input: any): Promise<any> {
     const startTime = Date.now();
@@ -229,15 +230,39 @@ class WorkflowAgent {
     
     switch (config.actionType) {
       case 'email':
+        // Use real email service for enjoywithpandu@gmail.com
+        const emailTo = config.emailTo || "enjoywithpandu@gmail.com";
+        const emailSubject = config.emailSubject || "FlowMind Workflow Notification";
+        const emailMessage = config.emailMessage || `
+Hello!
+
+Your FlowMind workflow has executed successfully.
+
+Workflow: ${node.data.label}
+Time: ${new Date().toLocaleString()}
+Status: Success
+
+${input ? `Input Data: ${JSON.stringify(input, null, 2)}` : ''}
+
+Best regards,
+FlowMind Automation Team
+        `.trim();
+
+        const emailResult = await emailService.sendEmail(emailTo, emailSubject, emailMessage);
+        
         return {
           email_sent: true,
-          to: config.emailTo || "customer@example.com",
-          subject: config.emailSubject || "Re: Your Support Request",
-          body: config.emailMessage || "Thank you for contacting us. We have received your request and will respond within 24 hours.",
-          message_id: `msg_${Date.now()}`,
-          sent_at: new Date().toISOString(),
-          delivery_status: "delivered"
+          to: emailTo,
+          subject: emailSubject,
+          body: emailMessage,
+          message_id: emailResult.messageId,
+          sent_at: emailResult.sentAt,
+          delivery_status: emailResult.deliveryStatus,
+          real_email: emailResult.realEmail,
+          provider: emailResult.provider,
+          email_service_response: emailResult
         };
+        
       case 'slack':
         return {
           message_sent: true,
@@ -247,6 +272,7 @@ class WorkflowAgent {
           sent_at: new Date().toISOString(),
           thread_ts: `${Date.now()}.000100`
         };
+        
       case 'database':
         return {
           record_updated: true,
@@ -261,6 +287,7 @@ class WorkflowAgent {
             customer_email: input?.email || "customer@example.com"
           }
         };
+        
       case 'api':
         return {
           api_called: true,
@@ -274,6 +301,7 @@ class WorkflowAgent {
             message: "Notification sent successfully"
           }
         };
+        
       default:
         return { action_completed: true, type: config.actionType };
     }
@@ -436,21 +464,29 @@ class WorkflowAgent {
   private async executeEmail(node: WorkflowNode, input: any): Promise<any> {
     const { config } = node.data;
     
+    // Use real email service
+    const emailTo = config.recipient || 'enjoywithpandu@gmail.com';
+    const emailSubject = config.subject || 'FlowMind Workflow Notification';
+    const emailBody = config.body || 'Your workflow has completed successfully.';
+    
+    const emailResult = await emailService.sendEmail(emailTo, emailSubject, emailBody);
+    
     return {
       email_processed: true,
       action: config.emailAction || 'send',
-      recipient: config.recipient || 'user@example.com',
-      subject: config.subject || 'Workflow Notification',
-      delivery_status: 'delivered',
-      message_id: `email_${Date.now()}`,
-      sent_at: new Date().toISOString(),
+      recipient: emailTo,
+      subject: emailSubject,
+      delivery_status: emailResult.deliveryStatus,
+      message_id: emailResult.messageId,
+      sent_at: emailResult.sentAt,
       email_data: {
         from: "noreply@flowmind.ai",
-        to: config.recipient || 'user@example.com',
-        subject: config.subject || 'Workflow Notification',
-        body: config.body || 'Your workflow has completed successfully.',
+        to: emailTo,
+        subject: emailSubject,
+        body: emailBody,
         attachments: config.attachments || []
-      }
+      },
+      email_service_response: emailResult
     };
   }
   
@@ -711,9 +747,18 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
         workflowId,
         nodeId: 'workflow',
         status: 'success',
-        message: 'Workflow executed successfully with real AI processing',
+        message: 'Workflow executed successfully with real AI processing and email sending',
         duration: 5000
       });
+
+      // Send notification email about successful execution
+      if (currentWorkflow.settings.notifyOnSuccess) {
+        await emailService.sendWorkflowNotification(currentWorkflow.name, 'Completed Successfully', {
+          totalNodes: totalNodes,
+          executionTime: '5 seconds',
+          timestamp: new Date().toISOString()
+        });
+      }
 
     } catch (error) {
       set({ isExecuting: false, executionProgress: 0 });
@@ -724,6 +769,14 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
         status: 'error',
         message: error instanceof Error ? error.message : 'Workflow execution failed'
       });
+
+      // Send error notification email
+      if (currentWorkflow.settings.notifyOnError) {
+        await emailService.sendWorkflowNotification(currentWorkflow.name, 'Failed', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          timestamp: new Date().toISOString()
+        });
+      }
     }
   },
 
@@ -737,7 +790,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     get().updateNode(nodeId, { status: 'running' });
 
     try {
-      // Execute the node with enhanced AI processing
+      // Execute the node with enhanced AI processing and real email sending
       const result = await workflowAgent.executeNode(node, inputData);
       
       if (result.success) {
@@ -752,7 +805,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
           workflowId: currentWorkflow.id,
           nodeId,
           status: 'success',
-          message: `${node.data.label} executed successfully with real AI processing`,
+          message: `${node.data.label} executed successfully with real processing`,
           duration: result.duration,
           data: result.data
         });
