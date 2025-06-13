@@ -166,7 +166,7 @@ const ExecutionResultsPanel: React.FC<ExecutionResultsPanelProps> = ({ isOpen, o
       </div>
 
       {/* Results List */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
         {nodeResults.length === 0 ? (
           <div className="text-center py-8">
             <Activity size={48} className="text-gray-300 mx-auto mb-4" />
@@ -176,11 +176,12 @@ const ExecutionResultsPanel: React.FC<ExecutionResultsPanelProps> = ({ isOpen, o
             </p>
           </div>
         ) : (
-          nodeResults.map((node) => (
+          nodeResults.map((node, index) => (
             <motion.div
               key={node.id}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: index * 0.05 }}
               className={`border rounded-lg p-4 ${
                 node.data.status === 'success' ? 'border-success-200 bg-success-50' :
                 node.data.status === 'error' ? 'border-error-200 bg-error-50' :
@@ -216,7 +217,7 @@ const ExecutionResultsPanel: React.FC<ExecutionResultsPanelProps> = ({ isOpen, o
                       <Copy size={12} />
                     </button>
                   </div>
-                  <div className="bg-white border rounded p-2 max-h-32 overflow-y-auto">
+                  <div className="bg-white border rounded p-2 max-h-32 overflow-y-auto custom-scrollbar">
                     <pre className="text-xs text-gray-700 whitespace-pre-wrap">
                       {JSON.stringify(node.data.output, null, 2)}
                     </pre>

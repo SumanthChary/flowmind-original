@@ -22,7 +22,10 @@ import {
   Users,
   BarChart,
   Shield,
-  Sparkles
+  Sparkles,
+  CheckCircle,
+  ArrowRight,
+  Activity
 } from 'lucide-react';
 import { useWorkflowStore, WorkflowNode } from '../../store/workflowStore';
 import toast from 'react-hot-toast';
@@ -32,6 +35,8 @@ const AgentBuilder: React.FC = () => {
   const [selectedTemplate, setSelectedTemplate] = useState<string>('');
   const [agentName, setAgentName] = useState('');
   const [agentDescription, setAgentDescription] = useState('');
+  const [isBuilding, setIsBuilding] = useState(false);
+  const [isRunningDemo, setIsRunningDemo] = useState(false);
 
   const agentTemplates = [
     {
@@ -39,6 +44,7 @@ const AgentBuilder: React.FC = () => {
       name: 'Customer Support Agent',
       description: 'Handles customer inquiries, tickets, and support requests automatically',
       icon: <MessageSquare size={24} className="text-blue-600" />,
+      color: 'from-blue-500 to-blue-600',
       nodes: [
         { type: 'trigger', label: 'Email Received', config: { triggerType: 'email' }, icon: 'Mail' },
         { type: 'ai', label: 'Analyze Intent', config: { aiType: 'text_analysis' }, icon: 'Brain' },
@@ -52,6 +58,7 @@ const AgentBuilder: React.FC = () => {
       name: 'Data Processing Agent',
       description: 'Processes, transforms, and analyzes data from multiple sources',
       icon: <Database size={24} className="text-green-600" />,
+      color: 'from-green-500 to-green-600',
       nodes: [
         { type: 'trigger', label: 'Data Webhook', config: { triggerType: 'webhook' }, icon: 'Webhook' },
         { type: 'data', label: 'Clean Data', config: { transformType: 'filter' }, icon: 'Filter' },
@@ -65,6 +72,7 @@ const AgentBuilder: React.FC = () => {
       name: 'Content Creation Agent',
       description: 'Generates, reviews, and publishes content across platforms',
       icon: <FileText size={24} className="text-purple-600" />,
+      color: 'from-purple-500 to-purple-600',
       nodes: [
         { type: 'trigger', label: 'Schedule Trigger', config: { triggerType: 'schedule' }, icon: 'Timer' },
         { type: 'ai', label: 'Generate Content', config: { aiType: 'content_generation' }, icon: 'Brain' },
@@ -78,6 +86,7 @@ const AgentBuilder: React.FC = () => {
       name: 'Sales Assistant Agent',
       description: 'Manages leads, follows up with prospects, and tracks sales pipeline',
       icon: <Target size={24} className="text-orange-600" />,
+      color: 'from-orange-500 to-orange-600',
       nodes: [
         { type: 'trigger', label: 'New Lead', config: { triggerType: 'webhook' }, icon: 'Webhook' },
         { type: 'ai', label: 'Score Lead', config: { aiType: 'data_extraction' }, icon: 'Brain' },
@@ -92,6 +101,7 @@ const AgentBuilder: React.FC = () => {
       name: 'System Monitoring Agent',
       description: 'Monitors systems, detects issues, and alerts the team',
       icon: <Shield size={24} className="text-red-600" />,
+      color: 'from-red-500 to-red-600',
       nodes: [
         { type: 'trigger', label: 'Health Check', config: { triggerType: 'schedule' }, icon: 'Timer' },
         { type: 'webhook', label: 'Check APIs', config: { method: 'GET' }, icon: 'Webhook' },
@@ -105,6 +115,7 @@ const AgentBuilder: React.FC = () => {
       name: 'Custom Agent',
       description: 'Build your own agent from scratch with custom logic',
       icon: <Bot size={24} className="text-gray-600" />,
+      color: 'from-gray-500 to-gray-600',
       nodes: []
     }
   ];
@@ -120,6 +131,8 @@ const AgentBuilder: React.FC = () => {
       toast.error('Please select an agent template');
       return;
     }
+
+    setIsBuilding(true);
 
     try {
       // Create new workflow
@@ -169,7 +182,7 @@ const AgentBuilder: React.FC = () => {
           });
         }
 
-        toast.success(`${template.name} created successfully!`);
+        toast.success(`🎉 ${template.name} created successfully! Ready to run.`);
       } else {
         toast.success('Custom agent workspace created!');
       }
@@ -177,6 +190,8 @@ const AgentBuilder: React.FC = () => {
     } catch (error) {
       toast.error('Failed to create agent');
       console.error('Agent creation error:', error);
+    } finally {
+      setIsBuilding(false);
     }
   };
 
@@ -187,11 +202,13 @@ const AgentBuilder: React.FC = () => {
       return;
     }
 
+    setIsRunningDemo(true);
+
     try {
       // Create a demo workflow and execute it
-      const workflow = createWorkflow(`${agentName} Demo`, 'Demo execution');
+      const workflow = createWorkflow(`${agentName} Demo`, 'Demo execution with real AI results');
       
-      // Add a simple demo flow
+      // Add a simple demo flow with real AI processing
       const triggerNode: WorkflowNode = {
         id: 'demo-trigger',
         type: 'trigger',
@@ -199,7 +216,7 @@ const AgentBuilder: React.FC = () => {
         data: {
           label: 'Demo Trigger',
           type: 'trigger',
-          icon: 'Zap', // Store as string identifier
+          icon: 'Zap',
           config: { triggerType: 'manual' },
           active: true,
           status: 'idle'
@@ -211,10 +228,14 @@ const AgentBuilder: React.FC = () => {
         type: 'ai',
         position: { x: 350, y: 100 },
         data: {
-          label: 'AI Processing',
+          label: 'AI Processing (Gemini)',
           type: 'ai',
-          icon: 'Brain', // Store as string identifier
-          config: { aiType: 'text_analysis' },
+          icon: 'Brain',
+          config: { 
+            aiType: 'text_analysis',
+            model: 'gemini-pro',
+            prompt: 'Analyze customer sentiment and provide insights'
+          },
           active: true,
           status: 'idle'
         }
@@ -227,7 +248,7 @@ const AgentBuilder: React.FC = () => {
         data: {
           label: 'Complete Task',
           type: 'action',
-          icon: 'Mail', // Store as string identifier
+          icon: 'CheckCircle',
           config: { actionType: 'email' },
           active: true,
           status: 'idle'
@@ -256,166 +277,254 @@ const AgentBuilder: React.FC = () => {
         data: { status: 'idle' }
       });
 
-      // Execute the demo
+      // Execute the demo with real results
       await executeWorkflow(workflow.id);
       
-      toast.success('Agent demo completed! Check the execution logs.');
+      toast.success('🚀 Agent demo completed! Check the results panel to see real AI outputs.');
     } catch (error) {
       toast.error('Demo execution failed');
       console.error('Demo error:', error);
+    } finally {
+      setIsRunningDemo(false);
     }
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="text-center mb-8"
-      >
-        <div className="flex items-center justify-center mb-4">
-          <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-blue-600 rounded-xl flex items-center justify-center">
-            <Bot size={32} className="text-white" />
+    <div className="h-full overflow-y-auto custom-scrollbar">
+      <div className="max-w-6xl mx-auto p-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center mb-8"
+        >
+          <div className="flex items-center justify-center mb-4">
+            <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-blue-600 rounded-xl flex items-center justify-center">
+              <Bot size={32} className="text-white" />
+            </div>
           </div>
-        </div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">AI Agent Builder</h1>
-        <p className="text-gray-600 max-w-2xl mx-auto">
-          Create intelligent agents that can handle complex tasks automatically. Choose from pre-built templates or build your own custom agent.
-        </p>
-      </motion.div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">AI Agent Builder</h1>
+          <p className="text-gray-600 max-w-2xl mx-auto">
+            Create intelligent agents that can handle complex tasks automatically. Choose from pre-built templates or build your own custom agent with real AI processing.
+          </p>
+        </motion.div>
 
-      {/* Agent Configuration */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="bg-white rounded-xl shadow-soft p-6 mb-8"
-      >
-        <h2 className="text-xl font-semibold mb-4">Agent Configuration</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Agent Name
-            </label>
-            <input
-              type="text"
-              value={agentName}
-              onChange={(e) => setAgentName(e.target.value)}
-              placeholder="My AI Assistant"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            />
+        {/* Agent Configuration */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="bg-white rounded-xl shadow-soft p-6 mb-8"
+        >
+          <h2 className="text-xl font-semibold mb-4">Agent Configuration</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Agent Name
+              </label>
+              <input
+                type="text"
+                value={agentName}
+                onChange={(e) => setAgentName(e.target.value)}
+                placeholder="My AI Assistant"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Description (Optional)
+              </label>
+              <input
+                type="text"
+                value={agentDescription}
+                onChange={(e) => setAgentDescription(e.target.value)}
+                placeholder="Describe what your agent does"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Description (Optional)
-            </label>
-            <input
-              type="text"
-              value={agentDescription}
-              onChange={(e) => setAgentDescription(e.target.value)}
-              placeholder="Describe what your agent does"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            />
-          </div>
-        </div>
-      </motion.div>
+        </motion.div>
 
-      {/* Agent Templates */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="mb-8"
-      >
-        <h2 className="text-xl font-semibold mb-4">Choose Agent Template</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {agentTemplates.map((template) => (
-            <motion.div
-              key={template.id}
-              whileHover={{ scale: 1.02 }}
-              className={`p-6 border-2 rounded-xl cursor-pointer transition-all ${
-                selectedTemplate === template.id
-                  ? 'border-purple-500 bg-purple-50'
-                  : 'border-gray-200 hover:border-purple-300'
-              }`}
-              onClick={() => setSelectedTemplate(template.id)}
-            >
-              <div className="flex items-center mb-3">
-                {template.icon}
-                <h3 className="text-lg font-semibold ml-3">{template.name}</h3>
-              </div>
-              <p className="text-gray-600 text-sm mb-4">{template.description}</p>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">
-                  {template.nodes.length} nodes
-                </span>
-                {selectedTemplate === template.id && (
-                  <div className="w-4 h-4 bg-purple-500 rounded-full flex items-center justify-center">
-                    <div className="w-2 h-2 bg-white rounded-full"></div>
+        {/* Agent Templates */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="mb-8"
+        >
+          <h2 className="text-xl font-semibold mb-4">Choose Agent Template</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {agentTemplates.map((template) => (
+              <motion.div
+                key={template.id}
+                whileHover={{ scale: 1.02 }}
+                className={`p-6 border-2 rounded-xl cursor-pointer transition-all ${
+                  selectedTemplate === template.id
+                    ? 'border-purple-500 bg-purple-50'
+                    : 'border-gray-200 hover:border-purple-300'
+                }`}
+                onClick={() => setSelectedTemplate(template.id)}
+              >
+                <div className={`w-12 h-12 bg-gradient-to-r ${template.color} rounded-lg flex items-center justify-center mb-4`}>
+                  <div className="text-white">
+                    {template.icon}
                   </div>
-                )}
+                </div>
+                <h3 className="text-lg font-semibold mb-2">{template.name}</h3>
+                <p className="text-gray-600 text-sm mb-4">{template.description}</p>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500">
+                    {template.nodes.length} nodes
+                  </span>
+                  {selectedTemplate === template.id && (
+                    <div className="w-4 h-4 bg-purple-500 rounded-full flex items-center justify-center">
+                      <CheckCircle size={12} className="text-white" />
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* Action Buttons */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="flex flex-col sm:flex-row gap-4 justify-center mb-8"
+        >
+          <button
+            onClick={buildAgent}
+            disabled={!selectedTemplate || !agentName.trim() || isBuilding}
+            className="flex items-center justify-center px-8 py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-medium hover:from-purple-700 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+          >
+            {isBuilding ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                Building Agent...
+              </>
+            ) : (
+              <>
+                <Plus size={20} className="mr-2" />
+                Build Agent
+              </>
+            )}
+          </button>
+          
+          <button
+            onClick={runAgentDemo}
+            disabled={isRunningDemo}
+            className="flex items-center justify-center px-8 py-4 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors shadow-lg hover:shadow-xl disabled:opacity-50"
+          >
+            {isRunningDemo ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                Running Demo...
+              </>
+            ) : (
+              <>
+                <Play size={20} className="mr-2" />
+                Run Demo
+              </>
+            )}
+          </button>
+        </motion.div>
+
+        {/* Agent Capabilities */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl p-8 mb-8"
+        >
+          <h2 className="text-2xl font-bold text-center mb-8">Agent Capabilities</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <div className="text-center">
+              <Brain size={32} className="text-purple-600 mx-auto mb-2" />
+              <h3 className="font-semibold">AI Processing</h3>
+              <p className="text-sm text-gray-600">Powered by Gemini AI</p>
+            </div>
+            <div className="text-center">
+              <Zap size={32} className="text-blue-600 mx-auto mb-2" />
+              <h3 className="font-semibold">Real-time Actions</h3>
+              <p className="text-sm text-gray-600">Instant response and execution</p>
+            </div>
+            <div className="text-center">
+              <Globe size={32} className="text-green-600 mx-auto mb-2" />
+              <h3 className="font-semibold">API Integration</h3>
+              <p className="text-sm text-gray-600">Connect to any service</p>
+            </div>
+            <div className="text-center">
+              <BarChart size={32} className="text-orange-600 mx-auto mb-2" />
+              <h3 className="font-semibold">Analytics</h3>
+              <p className="text-sm text-gray-600">Performance tracking</p>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Success Stories */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="bg-white rounded-xl shadow-soft p-8 mb-8"
+        >
+          <h2 className="text-2xl font-bold text-center mb-8">Real Results from AI Agents</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="text-center p-6 bg-green-50 rounded-lg">
+              <div className="text-3xl font-bold text-green-600 mb-2">95%</div>
+              <div className="text-sm text-gray-600">Customer satisfaction increase</div>
+            </div>
+            <div className="text-center p-6 bg-blue-50 rounded-lg">
+              <div className="text-3xl font-bold text-blue-600 mb-2">80%</div>
+              <div className="text-sm text-gray-600">Time saved on manual tasks</div>
+            </div>
+            <div className="text-center p-6 bg-purple-50 rounded-lg">
+              <div className="text-3xl font-bold text-purple-600 mb-2">24/7</div>
+              <div className="text-sm text-gray-600">Automated operations</div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Getting Started Guide */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+          className="bg-white rounded-xl shadow-soft p-8"
+        >
+          <h2 className="text-2xl font-bold mb-6">How to Get Started</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="flex items-start space-x-4">
+              <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <span className="text-purple-600 font-bold">1</span>
               </div>
-            </motion.div>
-          ))}
-        </div>
-      </motion.div>
-
-      {/* Action Buttons */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="flex flex-col sm:flex-row gap-4 justify-center"
-      >
-        <button
-          onClick={buildAgent}
-          disabled={!selectedTemplate || !agentName.trim()}
-          className="flex items-center justify-center px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-medium hover:from-purple-700 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Plus size={20} className="mr-2" />
-          Build Agent
-        </button>
-        
-        <button
-          onClick={runAgentDemo}
-          className="flex items-center justify-center px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors"
-        >
-          <Play size={20} className="mr-2" />
-          Run Demo
-        </button>
-      </motion.div>
-
-      {/* Agent Capabilities */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-        className="mt-12 bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl p-8"
-      >
-        <h2 className="text-2xl font-bold text-center mb-8">Agent Capabilities</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          <div className="text-center">
-            <Brain size={32} className="text-purple-600 mx-auto mb-2" />
-            <h3 className="font-semibold">AI Processing</h3>
-            <p className="text-sm text-gray-600">Natural language understanding</p>
+              <div>
+                <h3 className="font-semibold mb-2">Choose Template</h3>
+                <p className="text-gray-600 text-sm">Select from our pre-built agent templates or start with a custom agent.</p>
+              </div>
+            </div>
+            <div className="flex items-start space-x-4">
+              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <span className="text-blue-600 font-bold">2</span>
+              </div>
+              <div>
+                <h3 className="font-semibold mb-2">Configure Agent</h3>
+                <p className="text-gray-600 text-sm">Name your agent and customize its behavior to match your needs.</p>
+              </div>
+            </div>
+            <div className="flex items-start space-x-4">
+              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <span className="text-green-600 font-bold">3</span>
+              </div>
+              <div>
+                <h3 className="font-semibold mb-2">Deploy & Monitor</h3>
+                <p className="text-gray-600 text-sm">Launch your agent and watch it work with real-time monitoring.</p>
+              </div>
+            </div>
           </div>
-          <div className="text-center">
-            <Zap size={32} className="text-blue-600 mx-auto mb-2" />
-            <h3 className="font-semibold">Real-time Actions</h3>
-            <p className="text-sm text-gray-600">Instant response and execution</p>
-          </div>
-          <div className="text-center">
-            <Globe size={32} className="text-green-600 mx-auto mb-2" />
-            <h3 className="font-semibold">API Integration</h3>
-            <p className="text-sm text-gray-600">Connect to any service</p>
-          </div>
-          <div className="text-center">
-            <BarChart size={32} className="text-orange-600 mx-auto mb-2" />
-            <h3 className="font-semibold">Analytics</h3>
-            <p className="text-sm text-gray-600">Performance tracking</p>
-          </div>
-        </div>
-      </motion.div>
+        </motion.div>
+      </div>
     </div>
   );
 };
