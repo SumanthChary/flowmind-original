@@ -7,7 +7,7 @@ export interface WorkflowNode {
   position: { x: number; y: number };
   data: {
     label: string;
-    icon?: React.ReactNode;
+    icon?: string; // Changed from React.ReactNode to string to avoid serialization issues
     type: string;
     config: any;
     active: boolean;
@@ -117,8 +117,8 @@ interface WorkflowState {
   clearLogs: (workflowId: string) => void;
 }
 
-// Enhanced AI Agent for realistic workflow execution
-class EnhancedWorkflowAgent {
+// AI Agent for workflow execution
+class WorkflowAgent {
   async executeNode(node: WorkflowNode, input: any): Promise<any> {
     const startTime = Date.now();
     
@@ -177,160 +177,77 @@ class EnhancedWorkflowAgent {
   private async executeTrigger(node: WorkflowNode, input: any): Promise<any> {
     const { config } = node.data;
     
-    // Simulate realistic trigger processing
-    await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000));
-    
     switch (config.triggerType) {
-      case 'email':
-        return {
-          triggered: true,
-          email_received: {
-            from: 'customer@example.com',
-            to: config.emailFilter || 'support@company.com',
-            subject: 'Urgent: Need help with my order',
-            body: 'Hi, I need immediate assistance with my recent order. The product arrived damaged and I need a replacement ASAP.',
-            received_at: new Date().toISOString(),
-            message_id: `email_${Date.now()}`,
-            priority: 'high'
-          },
-          metadata: {
-            spam_score: 0.1,
-            sentiment: 'negative',
-            urgency: 'high'
-          }
-        };
+      case 'manual':
+        return { triggered: true, data: input || {} };
       case 'webhook':
-        return { 
-          triggered: true, 
-          webhook_data: {
-            url: `https://api.flowmind.ai/webhook/${node.id}`,
-            method: 'POST',
-            payload: input || { event: 'test', timestamp: new Date().toISOString() },
-            headers: { 'content-type': 'application/json' }
-          }
-        };
+        return { triggered: true, webhook_url: `https://api.flowmind.ai/webhook/${node.id}` };
       case 'schedule':
+        return { triggered: true, next_run: new Date(Date.now() + 60000).toISOString() };
+      case 'email':
         return { 
           triggered: true, 
-          schedule_info: {
-            cron: config.schedule || '0 9 * * *',
-            next_run: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-            timezone: 'UTC'
-          }
+          emails_monitored: config.emailFilter || 'all',
+          last_check: new Date().toISOString()
         };
       default:
-        return { triggered: true, input_data: input || {} };
+        return { triggered: true };
     }
   }
   
   private async executeAction(node: WorkflowNode, input: any): Promise<any> {
     const { config } = node.data;
     
-    // Simulate realistic action processing
-    await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 1500));
-    
     switch (config.actionType) {
       case 'email':
         return {
           email_sent: true,
-          delivery_info: {
-            to: config.emailTo || 'customer@example.com',
-            subject: config.emailSubject || 'Thank you for contacting us',
-            message_id: `msg_${Date.now()}`,
-            sent_at: new Date().toISOString(),
-            delivery_status: 'delivered',
-            open_tracking: true,
-            click_tracking: true
-          },
-          content: {
-            template_used: 'auto_reply_v2',
-            personalization: {
-              customer_name: 'John Doe',
-              order_number: '#12345'
-            }
-          }
+          to: config.emailTo,
+          subject: config.emailSubject,
+          message_id: `msg_${Date.now()}`,
+          sent_at: new Date().toISOString()
         };
       case 'slack':
         return {
           message_sent: true,
-          slack_response: {
-            channel: config.slackChannel || '#support-urgent',
-            message: config.slackMessage || 'URGENT: Customer needs immediate attention!',
-            message_id: `slack_${Date.now()}`,
-            sent_at: new Date().toISOString(),
-            thread_ts: `${Date.now()}.000100`,
-            reactions: ['eyes', 'white_check_mark']
-          },
-          team_notified: ['@sarah.support', '@mike.manager'],
-          escalation_level: 'high'
+          channel: config.slackChannel,
+          message_id: `slack_${Date.now()}`,
+          sent_at: new Date().toISOString()
         };
       case 'database':
         return {
           record_updated: true,
-          database_operation: {
-            table: config.table || 'support_tickets',
-            operation: config.operation || 'insert',
-            record_id: `ticket_${Date.now()}`,
-            affected_rows: 1,
-            execution_time: '45ms'
-          },
-          ticket_data: {
-            id: `ticket_${Date.now()}`,
-            customer_email: 'customer@example.com',
-            priority: 'high',
-            status: 'open',
-            assigned_to: 'sarah.support',
-            created_at: new Date().toISOString()
-          }
+          table: config.table || 'users',
+          affected_rows: Math.floor(Math.random() * 5) + 1,
+          updated_at: new Date().toISOString()
         };
       case 'api':
         return {
           api_called: true,
-          api_response: {
-            endpoint: config.apiUrl || 'https://api.crm.com/tickets',
-            method: 'POST',
-            status_code: 201,
-            response_time: Math.floor(Math.random() * 300) + 100,
-            response_body: {
-              ticket_id: `crm_${Date.now()}`,
-              status: 'created',
-              priority: 'high'
-            }
-          }
+          endpoint: config.apiUrl || 'https://api.example.com/data',
+          status_code: 200,
+          response_time: Math.floor(Math.random() * 500) + 100
         };
       default:
-        return { action_completed: true, timestamp: new Date().toISOString() };
+        return { action_completed: true };
     }
   }
   
   private async executeCondition(node: WorkflowNode, input: any): Promise<any> {
     const { config } = node.data;
-    
-    // Simulate condition evaluation
-    await new Promise(resolve => setTimeout(resolve, 200 + Math.random() * 300));
-    
-    const field = config.field || 'sentiment';
-    const value = config.value || 'urgent';
-    const conditionType = config.conditionType || 'contains';
-    
-    // Get value from input data
-    let inputValue;
-    if (input?.email_received?.body) {
-      inputValue = input.email_received.body.toLowerCase();
-    } else if (input?.metadata?.[field]) {
-      inputValue = input.metadata[field];
-    } else {
-      inputValue = input?.[field] || 'normal';
-    }
+    const field = config.field || 'status';
+    const value = config.value || 'active';
+    const conditionType = config.conditionType || 'equals';
     
     let result = false;
+    const inputValue = input?.[field];
     
     switch (conditionType) {
       case 'equals':
         result = inputValue === value;
         break;
       case 'contains':
-        result = String(inputValue).toLowerCase().includes(value.toLowerCase());
+        result = String(inputValue).includes(value);
         break;
       case 'greater':
         result = Number(inputValue) > Number(value);
@@ -343,26 +260,12 @@ class EnhancedWorkflowAgent {
         break;
     }
     
-    // For demo purposes, make urgent emails trigger the urgent path
-    if (field === 'sentiment' && value === 'urgent') {
-      result = input?.email_received?.body?.toLowerCase().includes('urgent') || 
-               input?.email_received?.body?.toLowerCase().includes('asap') ||
-               input?.metadata?.urgency === 'high';
-    }
-    
     return {
       condition_result: result,
-      evaluation: {
-        field_checked: field,
-        expected_value: value,
-        actual_value: inputValue,
-        condition_type: conditionType,
-        matched: result
-      },
-      routing: {
-        path_taken: result ? 'true' : 'false',
-        reason: result ? 'Condition matched - routing to urgent path' : 'Condition not matched - routing to normal path'
-      }
+      field_checked: field,
+      expected_value: value,
+      actual_value: inputValue,
+      condition_type: conditionType
     };
   }
   
@@ -371,24 +274,25 @@ class EnhancedWorkflowAgent {
     const duration = config.duration || 1;
     const unit = config.unit || 'seconds';
     
-    // For demo, simulate delay without actually waiting
-    await new Promise(resolve => setTimeout(resolve, 300));
+    let delayMs = duration * 1000; // Default to seconds
     
-    let delayMs = duration * 1000;
     switch (unit) {
-      case 'minutes': delayMs = duration * 60 * 1000; break;
-      case 'hours': delayMs = duration * 60 * 60 * 1000; break;
-      case 'days': delayMs = duration * 24 * 60 * 60 * 1000; break;
+      case 'minutes':
+        delayMs = duration * 60 * 1000;
+        break;
+      case 'hours':
+        delayMs = duration * 60 * 60 * 1000;
+        break;
+      case 'days':
+        delayMs = duration * 24 * 60 * 60 * 1000;
+        break;
     }
     
+    // For demo, we'll simulate delay without actually waiting
     return {
       delay_completed: true,
-      delay_info: {
-        duration: `${duration} ${unit}`,
-        delay_ms: delayMs,
-        started_at: new Date().toISOString(),
-        completed_at: new Date(Date.now() + delayMs).toISOString()
-      },
+      duration: `${duration} ${unit}`,
+      delayed_until: new Date(Date.now() + delayMs).toISOString(),
       input_data: input
     };
   }
@@ -396,91 +300,39 @@ class EnhancedWorkflowAgent {
   private async executeAI(node: WorkflowNode, input: any): Promise<any> {
     const { config } = node.data;
     
-    // Simulate AI processing with realistic delay
-    await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 2000));
+    // Simulate AI processing
+    await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
     
     switch (config.aiType) {
       case 'text_analysis':
-        const emailText = input?.email_received?.body || 'Sample customer email text';
         return {
-          ai_analysis: {
-            sentiment: 'negative',
-            confidence: 0.87,
-            urgency: 'high',
-            emotion: 'frustrated',
-            intent: 'complaint_resolution',
-            keywords: ['urgent', 'damaged', 'replacement', 'ASAP'],
-            language: 'en',
-            toxicity_score: 0.1
-          },
-          processing_info: {
-            model_used: config.model || 'gpt-4',
-            tokens_used: 156,
-            processing_time: '1.8s',
-            api_cost: '$0.003'
-          },
-          recommendations: [
-            'Escalate to senior support agent',
-            'Offer expedited replacement',
-            'Provide tracking information'
-          ]
+          sentiment: Math.random() > 0.5 ? 'positive' : 'negative',
+          confidence: Math.round(Math.random() * 100),
+          keywords: ['automation', 'workflow', 'efficiency'],
+          summary: 'AI analysis completed successfully'
         };
       case 'data_extraction':
         return {
           extracted_data: {
-            customer_info: {
-              name: 'John Doe',
-              email: 'customer@example.com',
-              phone: '+1-555-0123',
-              order_number: '#12345'
-            },
-            issue_details: {
-              product: 'Wireless Headphones',
-              problem: 'Damaged on arrival',
-              urgency: 'high',
-              resolution_needed: 'replacement'
-            }
+            name: 'John Doe',
+            email: 'john@example.com',
+            phone: '+1-555-0123'
           },
-          extraction_confidence: 0.94,
-          fields_found: 7,
-          processing_time: '2.1s'
+          confidence: 95,
+          fields_found: 3
         };
       case 'content_generation':
         return {
-          generated_content: {
-            response_email: `Dear John,
-
-Thank you for contacting us about your recent order #12345. I sincerely apologize that your Wireless Headphones arrived damaged.
-
-I understand how frustrating this must be, and I want to make this right immediately. I'm arranging for:
-- An expedited replacement to be shipped today
-- A prepaid return label for the damaged item
-- Priority processing to ensure faster delivery
-
-You should receive tracking information within 2 hours, and your replacement will arrive within 1-2 business days.
-
-Is there anything else I can help you with today?
-
-Best regards,
-Sarah - Customer Support Team`,
-            tone: 'empathetic_professional',
-            word_count: 98,
-            personalization_score: 0.92
-          },
-          generation_info: {
-            template_used: 'urgent_replacement_response',
-            model: 'gpt-4',
-            tokens_generated: 142,
-            quality_score: 0.95
-          }
+          generated_content: 'This is AI-generated content based on your input.',
+          word_count: 12,
+          tone: 'professional',
+          language: 'en'
         };
       default:
         return {
           ai_processed: true,
-          model_used: config.model || 'gpt-4',
-          tokens_used: Math.floor(Math.random() * 500) + 100,
-          confidence: Math.random() * 0.3 + 0.7,
-          processing_time: `${(Math.random() * 2 + 1).toFixed(1)}s`
+          model_used: 'gpt-4',
+          tokens_used: Math.floor(Math.random() * 1000) + 100
         };
     }
   }
@@ -488,57 +340,32 @@ Sarah - Customer Support Team`,
   private async executeWebhook(node: WorkflowNode, input: any): Promise<any> {
     const { config } = node.data;
     
-    await new Promise(resolve => setTimeout(resolve, 400 + Math.random() * 600));
-    
+    // Simulate webhook call
     return {
       webhook_called: true,
-      webhook_info: {
-        url: config.webhookUrl || 'https://api.external-service.com/webhook',
-        method: config.method || 'POST',
-        status_code: 200,
-        response_time: Math.floor(Math.random() * 300) + 50,
-        headers_sent: {
-          'content-type': 'application/json',
-          'user-agent': 'FlowMind-Agent/1.0'
-        }
-      },
-      payload_sent: input,
-      response_received: {
-        success: true,
-        message: 'Webhook processed successfully',
-        id: `webhook_${Date.now()}`
-      }
+      url: config.webhookUrl || 'https://api.example.com/webhook',
+      method: config.method || 'POST',
+      status_code: 200,
+      response_time: Math.floor(Math.random() * 300) + 50,
+      payload_sent: input
     };
   }
   
   private async executeEmail(node: WorkflowNode, input: any): Promise<any> {
     const { config } = node.data;
     
-    await new Promise(resolve => setTimeout(resolve, 600 + Math.random() * 800));
-    
     return {
       email_processed: true,
-      email_details: {
-        action: config.emailAction || 'send',
-        recipient: config.recipient || 'customer@example.com',
-        subject: config.subject || 'Your Support Request',
-        delivery_status: 'delivered',
-        message_id: `email_${Date.now()}`,
-        sent_at: new Date().toISOString(),
-        provider: 'SendGrid',
-        tracking: {
-          delivered: true,
-          opened: false,
-          clicked: false
-        }
-      }
+      action: config.emailAction || 'send',
+      recipient: config.recipient || 'user@example.com',
+      subject: config.subject || 'Workflow Notification',
+      delivery_status: 'delivered',
+      message_id: `email_${Date.now()}`
     };
   }
   
   private async executeDataTransform(node: WorkflowNode, input: any): Promise<any> {
     const { config } = node.data;
-    
-    await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 400));
     
     let transformedData = { ...input };
     
@@ -547,16 +374,13 @@ Sarah - Customer Support Team`,
         ...transformedData,
         mapped_at: new Date().toISOString(),
         original_keys: Object.keys(input || {}),
-        transformed: true,
-        mapping_rules_applied: config.mappingRules || 'default'
+        transformed: true
       };
     } else if (config.transformType === 'filter') {
       transformedData = {
         filtered_data: transformedData,
         filter_applied: config.filterCondition || 'default',
-        items_before: Array.isArray(input) ? input.length : 1,
-        items_after: Math.floor(Math.random() * 10) + 1,
-        filter_efficiency: '87%'
+        items_remaining: Math.floor(Math.random() * 10) + 1
       };
     }
     
@@ -564,7 +388,7 @@ Sarah - Customer Support Team`,
   }
 }
 
-const enhancedWorkflowAgent = new EnhancedWorkflowAgent();
+const workflowAgent = new WorkflowAgent();
 
 export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   workflows: [],
@@ -607,7 +431,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       },
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      status: 'active',
+      status: 'draft',
       size: 0,
     };
 
@@ -688,47 +512,26 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   },
 
   addNode: (node: WorkflowNode) => {
-    const { nodes, edges, currentWorkflow } = get();
+    const { nodes, edges } = get();
     const newNodes = [...nodes, node];
     set({ nodes: newNodes });
-    
-    if (currentWorkflow) {
-      const updatedWorkflow = { ...currentWorkflow, nodes: newNodes };
-      set({ currentWorkflow: updatedWorkflow });
-      get().saveWorkflow(updatedWorkflow);
-    }
-    
     get().saveHistory(newNodes, edges);
   },
 
   updateNode: (id: string, updates: Partial<WorkflowNode['data']>) => {
-    const { nodes, edges, currentWorkflow } = get();
+    const { nodes, edges } = get();
     const newNodes = nodes.map(node => 
       node.id === id ? { ...node, data: { ...node.data, ...updates } } : node
     );
     set({ nodes: newNodes });
-    
-    if (currentWorkflow) {
-      const updatedWorkflow = { ...currentWorkflow, nodes: newNodes };
-      set({ currentWorkflow: updatedWorkflow });
-      get().saveWorkflow(updatedWorkflow);
-    }
-    
     get().saveHistory(newNodes, edges);
   },
 
   deleteNode: (id: string) => {
-    const { nodes, edges, currentWorkflow } = get();
+    const { nodes, edges } = get();
     const newNodes = nodes.filter(node => node.id !== id);
     const newEdges = edges.filter(edge => edge.source !== id && edge.target !== id);
     set({ nodes: newNodes, edges: newEdges });
-    
-    if (currentWorkflow) {
-      const updatedWorkflow = { ...currentWorkflow, nodes: newNodes, edges: newEdges };
-      set({ currentWorkflow: updatedWorkflow });
-      get().saveWorkflow(updatedWorkflow);
-    }
-    
     get().saveHistory(newNodes, newEdges);
   },
 
@@ -761,16 +564,9 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   },
 
   addEdge: (edge: WorkflowEdge) => {
-    const { nodes, edges, currentWorkflow } = get();
+    const { nodes, edges } = get();
     const newEdges = [...edges, edge];
     set({ edges: newEdges });
-    
-    if (currentWorkflow) {
-      const updatedWorkflow = { ...currentWorkflow, edges: newEdges };
-      set({ currentWorkflow: updatedWorkflow });
-      get().saveWorkflow(updatedWorkflow);
-    }
-    
     get().saveHistory(nodes, newEdges);
   },
 
@@ -821,16 +617,8 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
         workflowId,
         nodeId: 'workflow',
         status: 'success',
-        message: 'AI Agent executed successfully with real results!',
-        duration: 5000,
-        data: { 
-          execution_summary: {
-            total_nodes: totalNodes,
-            successful_nodes: totalNodes,
-            execution_time: '5.2s',
-            data_processed: 'Customer support email analyzed and responded to'
-          }
-        }
+        message: 'Workflow executed successfully',
+        duration: 5000
       });
 
     } catch (error) {
@@ -855,8 +643,8 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     get().updateNode(nodeId, { status: 'running' });
 
     try {
-      // Execute the node with enhanced agent
-      const result = await enhancedWorkflowAgent.executeNode(node, inputData);
+      // Execute the node
+      const result = await workflowAgent.executeNode(node, inputData);
       
       if (result.success) {
         get().updateNode(nodeId, { 

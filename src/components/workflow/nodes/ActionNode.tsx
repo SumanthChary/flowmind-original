@@ -17,6 +17,14 @@ const ActionNode = ({ data, selected }: NodeProps<WorkflowNode['data']>) => {
     }
   };
 
+  // Safe icon rendering - convert string to component or use default
+  const renderIcon = () => {
+    if (typeof data.icon === 'string') {
+      return <Play size={18} />;
+    }
+    return data.icon || <Play size={18} />;
+  };
+
   return (
     <motion.div
       className={`px-4 py-3 shadow-lg rounded-lg bg-gradient-to-r from-accent-500 to-accent-600 border-2 min-w-[200px] relative ${
@@ -50,7 +58,7 @@ const ActionNode = ({ data, selected }: NodeProps<WorkflowNode['data']>) => {
       <div className="flex items-center">
         <div className="flex items-center justify-center w-8 h-8 bg-white bg-opacity-20 rounded-lg mr-3">
           <div className="text-white">
-            {data.icon || <Play size={18} />}
+            {renderIcon()}
           </div>
         </div>
         <div className="flex-1">

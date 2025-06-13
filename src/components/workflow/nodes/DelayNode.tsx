@@ -17,6 +17,14 @@ const DelayNode = ({ data, selected }: NodeProps<WorkflowNode['data']>) => {
     }
   };
 
+  // Safe icon rendering - convert string to component or use default
+  const renderIcon = () => {
+    if (typeof data.icon === 'string') {
+      return <Clock size={18} />;
+    }
+    return data.icon || <Clock size={18} />;
+  };
+
   const getDurationText = () => {
     const duration = data.config?.duration || 1;
     const unit = data.config?.unit || 'minutes';
@@ -56,7 +64,7 @@ const DelayNode = ({ data, selected }: NodeProps<WorkflowNode['data']>) => {
       <div className="flex items-center">
         <div className="flex items-center justify-center w-8 h-8 bg-white bg-opacity-20 rounded-lg mr-3">
           <div className="text-white">
-            {data.icon || <Clock size={18} />}
+            {renderIcon()}
           </div>
         </div>
         <div className="flex-1">
