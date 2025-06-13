@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Menu, X, Bot, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Menu, X, Bot, MessageSquare, BarChart } from 'lucide-react';
 import EnhancedWorkflowBuilder from '../components/workflow/EnhancedWorkflowBuilder';
 import AIAssistant from '../components/workflow/AIAssistant';
+import ExecutionResultsPanel from '../components/workflow/ExecutionResultsPanel';
 import { useWorkflowStore } from '../store/workflowStore';
 import toast from 'react-hot-toast';
 
@@ -12,12 +13,15 @@ const WorkflowBuilderPage = () => {
   const workflowId = searchParams.get('id');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
+  const [showResults, setShowResults] = useState(false);
   
   const { 
     currentWorkflow, 
     createWorkflow, 
     loadWorkflow, 
-    updateWorkflow 
+    updateWorkflow,
+    nodes,
+    executionLogs
   } = useWorkflowStore();
 
   useEffect(() => {
@@ -47,6 +51,12 @@ const WorkflowBuilderPage = () => {
       toast.success('Workflow saved!');
     }
   };
+
+  // Check if there are execution results to show
+  const hasResults = currentWorkflow && (
+    nodes.some(node => node.data.output || node.data.status !== 'idle') ||
+    executionLogs.some(log => log.workflowId === currentWorkflow.id)
+  );
 
   if (!currentWorkflow) {
     return (
@@ -86,6 +96,18 @@ const WorkflowBuilderPage = () => {
           >
             <Bot size={20} />
           </button>
+          {hasResults && (
+            <button
+              onClick={() => setShowResults(!showResults)}
+              className={`p-2 rounded-lg transition-colors ${
+                showResults 
+                  ? 'bg-success-100 text-success-600' 
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+              }`}
+            >
+              <BarChart size={20} />
+            </button>
+          )}
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
@@ -130,6 +152,20 @@ const WorkflowBuilderPage = () => {
             <Bot size={18} className="mr-2" />
             AI Assistant
           </button>
+
+          {hasResults && (
+            <button
+              onClick={() => setShowResults(!showResults)}
+              className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors ${
+                showResults
+                  ? 'bg-success-600 text-white'
+                  : 'bg-success-100 text-success-600 hover:bg-success-200'
+              }`}
+            >
+              <BarChart size={18} className="mr-2" />
+              View Results
+            </button>
+          )}
           
           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
             currentWorkflow.status === 'active' ? 'bg-success-100 text-success-700' :
@@ -184,6 +220,22 @@ const WorkflowBuilderPage = () => {
                 <Bot size={18} className="mr-2" />
                 {showAIAssistant ? 'Hide' : 'Show'} AI Assistant
               </button>
+              {hasResults && (
+                <button
+                  onClick={() => {
+                    setShowResults(!showResults);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-center px-4 py-2 rounded-lg font-medium transition-colors ${
+                    showResults
+                      ? 'bg-success-600 text-white'
+                      : 'bg-success-100 text-success-600'
+                  }`}
+                >
+                  <BarChart size={18} className="mr-2" />
+                  {showResults ? 'Hide' : 'Show'} Results
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -200,6 +252,12 @@ const WorkflowBuilderPage = () => {
         <AIAssistant 
           isOpen={showAIAssistant}
           onClose={() => setShowAIAssistant(false)}
+        />
+
+        {/* Execution Results Panel */}
+        <ExecutionResultsPanel 
+          isOpen={showResults}
+          onClose={() => setShowResults(false)}
         />
       </div>
     </div>

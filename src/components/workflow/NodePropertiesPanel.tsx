@@ -18,10 +18,30 @@ import {
   MessageSquare,
   AlertCircle,
   CheckCircle,
-  Clock
+  Clock,
+  Brain,
+  Globe,
+  Code,
+  Zap
 } from 'lucide-react';
 import { WorkflowNode } from '../../store/workflowStore';
 import toast from 'react-hot-toast';
+
+// Icon mapping for node properties
+const iconMap: Record<string, React.ReactNode> = {
+  Mail: <Mail size={20} />,
+  Calendar: <Calendar size={20} />,
+  FileText: <FileText size={20} />,
+  Database: <Database size={20} />,
+  Webhook: <Webhook size={20} />,
+  Filter: <Filter size={20} />,
+  Timer: <Timer size={20} />,
+  MessageSquare: <MessageSquare size={20} />,
+  Brain: <Brain size={20} />,
+  Globe: <Globe size={20} />,
+  Code: <Code size={20} />,
+  Zap: <Zap size={20} />,
+};
 
 interface NodePropertiesPanelProps {
   node: WorkflowNode;
@@ -79,6 +99,14 @@ const NodePropertiesPanel = ({
       default:
         return <div className="w-4 h-4 bg-gray-300 rounded-full" />;
     }
+  };
+
+  // Safe icon rendering
+  const renderNodeIcon = () => {
+    if (typeof node.data.icon === 'string') {
+      return iconMap[node.data.icon] || <Settings size={20} />;
+    }
+    return <Settings size={20} />;
   };
 
   const renderNodeSpecificConfig = () => {
@@ -304,6 +332,57 @@ const NodePropertiesPanel = ({
           </div>
         );
 
+      case 'ai':
+        return (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                AI Processing Type
+              </label>
+              <select
+                value={config.aiType || 'text_analysis'}
+                onChange={(e) => handleConfigChange('aiType', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+              >
+                <option value="text_analysis">Text Analysis</option>
+                <option value="sentiment_analysis">Sentiment Analysis</option>
+                <option value="data_extraction">Data Extraction</option>
+                <option value="content_generation">Content Generation</option>
+                <option value="classification">Classification</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                AI Model
+              </label>
+              <select
+                value={config.model || 'gpt-4'}
+                onChange={(e) => handleConfigChange('model', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+              >
+                <option value="gpt-4">GPT-4</option>
+                <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                <option value="claude-3">Claude 3</option>
+                <option value="gemini-pro">Gemini Pro</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Custom Prompt (Optional)
+              </label>
+              <textarea
+                value={config.prompt || ''}
+                onChange={(e) => handleConfigChange('prompt', e.target.value)}
+                placeholder="Custom instructions for AI processing..."
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+        );
+
       default:
         return null;
     }
@@ -331,7 +410,7 @@ const NodePropertiesPanel = ({
         {/* Node Type Display */}
         <div className="flex items-center p-3 bg-gray-50 rounded-lg mb-4">
           <div className="text-accent-600 mr-3">
-            {node.data.icon}
+            {renderNodeIcon()}
           </div>
           <div className="flex-1">
             <div className="font-medium text-gray-900">{node.data.label}</div>
@@ -377,6 +456,18 @@ const NodePropertiesPanel = ({
                 Last executed: {new Date(node.data.lastExecuted).toLocaleString()}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Execution Results */}
+        {node.data.output && (
+          <div className="mb-4 p-3 rounded-lg bg-blue-50 border border-blue-200">
+            <div className="text-sm font-medium text-blue-900 mb-2">Execution Results</div>
+            <div className="text-xs bg-white p-2 rounded border max-h-32 overflow-y-auto">
+              <pre className="whitespace-pre-wrap text-gray-700">
+                {JSON.stringify(node.data.output, null, 2)}
+              </pre>
+            </div>
           </div>
         )}
       </div>
