@@ -41,7 +41,12 @@ import {
   Pause,
   Square,
   RotateCcw,
-  RotateCw
+  RotateCw,
+  Trash2,
+  Power,
+  PowerOff,
+  Copy,
+  Edit
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -178,6 +183,8 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
     setEdges, 
     addNode, 
     addEdge: addWorkflowEdge,
+    deleteNode,
+    updateNode,
     currentWorkflow,
     isExecuting,
     executionProgress,
@@ -199,6 +206,7 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
   const [isMobile, setIsMobile] = useState(false);
   const [showAgentBuilder, setShowAgentBuilder] = useState(false);
   const [showNodeInspector, setShowNodeInspector] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{x: number, y: number, nodeId: string} | null>(null);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -239,11 +247,22 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
     setSelectedNode(node.id);
     setShowNodeInspector(true);
+    setContextMenu(null);
   }, [setSelectedNode]);
+
+  const onNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {
+    event.preventDefault();
+    setContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      nodeId: node.id
+    });
+  }, []);
 
   const onPaneClick = useCallback(() => {
     setSelectedNode(null);
     setShowNodeInspector(false);
+    setContextMenu(null);
   }, [setSelectedNode]);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
@@ -309,6 +328,38 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
   const handleRun = async () => {
     if (!currentWorkflow) return;
     await executeWorkflow(currentWorkflow.id);
+  };
+
+  const handleDeleteNode = (nodeId: string) => {
+    const node = nodes.find(n => n.id === nodeId);
+    if (node && confirm(`Delete "${node.data.label}"?`)) {
+      deleteNode(nodeId);
+      setContextMenu(null);
+      toast.success('Node deleted');
+    }
+  };
+
+  const handleToggleNodeActive = (nodeId: string) => {
+    const node = nodes.find(n => n.id === nodeId);
+    if (node) {
+      updateNode(nodeId, { active: !node.data.active });
+      setContextMenu(null);
+      toast.success(node.data.active ? 'Node deactivated' : 'Node activated');
+    }
+  };
+
+  const handleDuplicateNode = (nodeId: string) => {
+    const node = nodes.find(n => n.id === nodeId);
+    if (node) {
+      const newNode = {
+        ...node,
+        id: `${node.id}-copy-${Date.now()}`,
+        position: { x: node.position.x + 50, y: node.position.y + 50 }
+      };
+      addNode(newNode);
+      setContextMenu(null);
+      toast.success('Node duplicated');
+    }
   };
 
   const groupedTemplates = nodeTemplates.reduce((acc, template) => {
@@ -528,6 +579,7 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
             onDrop={onDrop}
             onDragOver={onDragOver}
             onNodeClick={onNodeClick}
+            onNodeContextMenu={onNodeContextMenu}
             onPaneClick={onPaneClick}
             nodeTypes={nodeTypes}
             fitView
@@ -548,6 +600,57 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
           </ReactFlow>
         </div>
       </div>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <div
+          className="fixed bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-50"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+        >
+          <button
+            onClick={() => {
+              setSelectedNode(contextMenu.nodeId);
+              setShowNodeInspector(true);
+              setContextMenu(null);
+            }}
+            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+          >
+            <Edit size={16} className="mr-2" />
+            Edit Node
+          </button>
+          <button
+            onClick={() => handleDuplicateNode(contextMenu.nodeId)}
+            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+          >
+            <Copy size={16} className="mr-2" />
+            Duplicate
+          </button>
+          <button
+            onClick={() => handleToggleNodeActive(contextMenu.nodeId)}
+            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+          >
+            {nodes.find(n => n.id === contextMenu.nodeId)?.data.active ? (
+              <>
+                <PowerOff size={16} className="mr-2" />
+                Deactivate
+              </>
+            ) : (
+              <>
+                <Power size={16} className="mr-2" />
+                Activate
+              </>
+            )}
+          </button>
+          <hr className="my-1" />
+          <button
+            onClick={() => handleDeleteNode(contextMenu.nodeId)}
+            className="w-full text-left px-4 py-2 text-sm text-error-600 hover:bg-error-50 flex items-center"
+          >
+            <Trash2 size={16} className="mr-2" />
+            Delete
+          </button>
+        </div>
+      )}
 
       {/* Node Inspector */}
       <NodeInspector
