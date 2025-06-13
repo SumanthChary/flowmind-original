@@ -280,7 +280,7 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
       setNodes([...nodes, newNode]);
       addNode(newNode);
       setDraggedTemplate(null);
-      toast.success(`${draggedTemplate.label} added`);
+      toast.success(`${draggedTemplate.label} added to canvas`);
     },
     [reactFlowInstance, draggedTemplate, nodes, setNodes, addNode]
   );
@@ -303,7 +303,7 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
     
     saveWorkflow(updatedWorkflow);
     onSave?.(updatedWorkflow);
-    toast.success('Workflow saved!');
+    toast.success('Workflow saved successfully!');
   };
 
   const handleRun = async () => {
@@ -358,7 +358,7 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
                   <X size={18} />
                 </button>
               </div>
-              <p className="text-sm text-gray-600 mb-4">Drag and drop to build your automation</p>
+              <p className="text-sm text-gray-600 mb-4">Drag and drop nodes to build your automation workflow</p>
             </div>
 
             {/* Actions */}
