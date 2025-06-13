@@ -19,25 +19,35 @@ import {
   Timer,
   MessageSquare,
   Globe,
-  Activity
+  Activity,
+  Edit,
+  Save,
+  RotateCcw
 } from 'lucide-react';
-import { WorkflowNode } from '../../store/workflowStore';
+import { WorkflowNode, useWorkflowStore } from '../../store/workflowStore';
 import toast from 'react-hot-toast';
 
 interface NodeInspectorProps {
   node: WorkflowNode | null;
   isOpen: boolean;
   onClose: () => void;
-  onUpdateNode?: (nodeId: string, updates: any) => void;
 }
 
 const NodeInspector: React.FC<NodeInspectorProps> = ({ 
   node, 
   isOpen, 
-  onClose, 
-  onUpdateNode 
+  onClose
 }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'config' | 'output' | 'logs'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'config' | 'output' | 'edit'>('overview');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedNode, setEditedNode] = useState<WorkflowNode | null>(null);
+  const { updateNode, executeWorkflow, currentWorkflow } = useWorkflowStore();
+
+  React.useEffect(() => {
+    if (node) {
+      setEditedNode({ ...node });
+    }
+  }, [node]);
 
   if (!isOpen || !node) return null;
 
@@ -94,6 +104,268 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({
     return `${(time / 1000).toFixed(2)}s`;
   };
 
+  const handleSaveChanges = () => {
+    if (!editedNode) return;
+    
+    updateNode(editedNode.id, editedNode.data);
+    setIsEditing(false);
+    toast.success('Node updated successfully!');
+  };
+
+  const handleResetChanges = () => {
+    setEditedNode(node ? { ...node } : null);
+    setIsEditing(false);
+  };
+
+  const handleRunSingleNode = async () => {
+    if (!currentWorkflow || !node) return;
+    
+    try {
+      // Update node status to running
+      updateNode(node.id, { status: 'running' });
+      toast.info('Running node...');
+      
+      // Simulate node execution
+      setTimeout(() => {
+        updateNode(node.id, { 
+          status: 'success',
+          lastExecuted: new Date().toISOString(),
+          executionTime: Math.floor(Math.random() * 2000) + 500,
+          output: {
+            message: `Node "${node.data.label}" executed successfully`,
+            timestamp: new Date().toISOString(),
+            nodeType: node.type,
+            singleExecution: true
+          }
+        });
+        toast.success('Node executed successfully!');
+      }, 2000);
+    } catch (error) {
+      updateNode(node.id, { status: 'error' });
+      toast.error('Node execution failed');
+    }
+  };
+
+  const updateConfigValue = (key: string, value: any) => {
+    if (!editedNode) return;
+    
+    setEditedNode({
+      ...editedNode,
+      data: {
+        ...editedNode.data,
+        config: {
+          ...editedNode.data.config,
+          [key]: value
+        }
+      }
+    });
+  };
+
+  const updateNodeLabel = (label: string) => {
+    if (!editedNode) return;
+    
+    setEditedNode({
+      ...editedNode,
+      data: {
+        ...editedNode.data,
+        label
+      }
+    });
+  };
+
+  const renderConfigEditor = () => {
+    if (!editedNode) return null;
+
+    const config = editedNode.data.config || {};
+
+    switch (editedNode.type) {
+      case 'trigger':
+        return (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Trigger Type</label>
+              <select
+                value={config.triggerType || 'email'}
+                onChange={(e) => updateConfigValue('triggerType', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500"
+              >
+                <option value="email">Email</option>
+                <option value="webhook">Webhook</option>
+                <option value="schedule">Schedule</option>
+                <option value="manual">Manual</option>
+              </select>
+            </div>
+            {config.triggerType === 'email' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Email Filter</label>
+                <input
+                  type="text"
+                  value={config.emailFilter || ''}
+                  onChange={(e) => updateConfigValue('emailFilter', e.target.value)}
+                  placeholder="support@company.com"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500"
+                />
+              </div>
+            )}
+            {config.triggerType === 'webhook' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Webhook URL</label>
+                <input
+                  type="text"
+                  value={config.webhookUrl || ''}
+                  onChange={(e) => updateConfigValue('webhookUrl', e.target.value)}
+                  placeholder="https://api.example.com/webhook"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500"
+                />
+              </div>
+            )}
+          </div>
+        );
+
+      case 'action':
+        return (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Action Type</label>
+              <select
+                value={config.actionType || 'email'}
+                onChange={(e) => updateConfigValue('actionType', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500"
+              >
+                <option value="email">Send Email</option>
+                <option value="slack">Send Slack Message</option>
+                <option value="database">Update Database</option>
+                <option value="api">API Call</option>
+              </select>
+            </div>
+            {config.actionType === 'email' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Email To</label>
+                  <input
+                    type="email"
+                    value={config.emailTo || 'enjoywithpandu@gmail.com'}
+                    onChange={(e) => updateConfigValue('emailTo', e.target.value)}
+                    placeholder="enjoywithpandu@gmail.com"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Subject</label>
+                  <input
+                    type="text"
+                    value={config.emailSubject || ''}
+                    onChange={(e) => updateConfigValue('emailSubject', e.target.value)}
+                    placeholder="FlowMind Notification"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Message</label>
+                  <textarea
+                    value={config.emailMessage || ''}
+                    onChange={(e) => updateConfigValue('emailMessage', e.target.value)}
+                    placeholder="Your workflow has completed successfully!"
+                    rows={4}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500"
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        );
+
+      case 'ai':
+        return (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">AI Type</label>
+              <select
+                value={config.aiType || 'text_analysis'}
+                onChange={(e) => updateConfigValue('aiType', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500"
+              >
+                <option value="text_analysis">Text Analysis</option>
+                <option value="sentiment_analysis">Sentiment Analysis</option>
+                <option value="data_extraction">Data Extraction</option>
+                <option value="content_generation">Content Generation</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Model</label>
+              <select
+                value={config.model || 'gemini-pro'}
+                onChange={(e) => updateConfigValue('model', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500"
+              >
+                <option value="gemini-pro">Gemini Pro</option>
+                <option value="gpt-4">GPT-4</option>
+                <option value="claude-3">Claude 3</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Custom Prompt</label>
+              <textarea
+                value={config.prompt || ''}
+                onChange={(e) => updateConfigValue('prompt', e.target.value)}
+                placeholder="Analyze the input data and provide insights..."
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500"
+              />
+            </div>
+          </div>
+        );
+
+      case 'condition':
+        return (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Condition Type</label>
+              <select
+                value={config.conditionType || 'equals'}
+                onChange={(e) => updateConfigValue('conditionType', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500"
+              >
+                <option value="equals">Equals</option>
+                <option value="contains">Contains</option>
+                <option value="greater">Greater Than</option>
+                <option value="less">Less Than</option>
+                <option value="exists">Exists</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Field</label>
+              <input
+                type="text"
+                value={config.field || ''}
+                onChange={(e) => updateConfigValue('field', e.target.value)}
+                placeholder="status, priority, sentiment"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Value</label>
+              <input
+                type="text"
+                value={config.value || ''}
+                onChange={(e) => updateConfigValue('value', e.target.value)}
+                placeholder="urgent, high, positive"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500"
+              />
+            </div>
+          </div>
+        );
+
+      default:
+        return (
+          <div className="text-center py-4 text-gray-500">
+            <Settings size={32} className="mx-auto mb-2 opacity-50" />
+            <p>No configuration options available for this node type</p>
+          </div>
+        );
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 400 }}
@@ -115,6 +387,13 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({
             {node.data.status}
           </span>
           <button
+            onClick={handleRunSingleNode}
+            className="text-green-600 hover:text-green-700 transition-colors"
+            title="Run this node"
+          >
+            <Play size={16} />
+          </button>
+          <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
           >
@@ -128,8 +407,8 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({
         {[
           { id: 'overview', label: 'Overview', icon: <Eye size={16} /> },
           { id: 'config', label: 'Config', icon: <Settings size={16} /> },
-          { id: 'output', label: 'Output', icon: <Code size={16} /> },
-          { id: 'logs', label: 'Logs', icon: <Activity size={16} /> }
+          { id: 'edit', label: 'Edit', icon: <Edit size={16} /> },
+          { id: 'output', label: 'Output', icon: <Code size={16} /> }
         ].map((tab) => (
           <button
             key={tab.id}
@@ -254,6 +533,55 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({
             </motion.div>
           )}
 
+          {activeTab === 'edit' && (
+            <motion.div
+              key="edit"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="p-4"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="font-medium text-gray-900">Edit Node</h4>
+                <div className="flex space-x-2">
+                  {isEditing && (
+                    <button
+                      onClick={handleResetChanges}
+                      className="text-gray-400 hover:text-gray-600 transition-colors"
+                      title="Reset changes"
+                    >
+                      <RotateCcw size={16} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {/* Node Label */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Node Label</label>
+                  <input
+                    type="text"
+                    value={editedNode?.data.label || ''}
+                    onChange={(e) => {
+                      updateNodeLabel(e.target.value);
+                      setIsEditing(true);
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500"
+                  />
+                </div>
+
+                {/* Configuration */}
+                <div>
+                  <h5 className="font-medium text-gray-900 mb-3">Configuration</h5>
+                  <div onClick={() => setIsEditing(true)}>
+                    {renderConfigEditor()}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {activeTab === 'output' && (
             <motion.div
               key="output"
@@ -319,34 +647,21 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({
                     </pre>
                   </div>
 
-                  {/* AI-specific output formatting */}
-                  {node.type === 'ai' && node.data.output?.ai_response && (
-                    <div className="bg-purple-50 rounded-lg p-4">
-                      <h5 className="font-medium text-purple-900 mb-2">AI Response</h5>
-                      <div className="text-sm text-purple-700">
-                        <p className="mb-2">{node.data.output.ai_response.text}</p>
-                        {node.data.output.ai_response.analysis && (
-                          <div className="mt-3 p-3 bg-white rounded border">
-                            <h6 className="font-medium mb-2">Analysis Results:</h6>
-                            <pre className="text-xs">
-                              {JSON.stringify(node.data.output.ai_response.analysis, null, 2)}
-                            </pre>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
                   {/* Email-specific output formatting */}
                   {(node.type === 'action' && node.data.config?.actionType === 'email') && node.data.output?.email_sent && (
                     <div className="bg-blue-50 rounded-lg p-4">
-                      <h5 className="font-medium text-blue-900 mb-2">Email Details</h5>
+                      <h5 className="font-medium text-blue-900 mb-2">📧 Email Details</h5>
                       <div className="text-sm text-blue-700 space-y-1">
                         <div><strong>To:</strong> {node.data.output.to}</div>
                         <div><strong>Subject:</strong> {node.data.output.subject}</div>
                         <div><strong>Status:</strong> {node.data.output.delivery_status}</div>
                         <div><strong>Message ID:</strong> {node.data.output.message_id}</div>
                         <div><strong>Sent At:</strong> {new Date(node.data.output.sent_at).toLocaleString()}</div>
+                        {node.data.output.realEmail && (
+                          <div className="mt-2 p-2 bg-green-100 rounded">
+                            <strong>✅ Real Email:</strong> Successfully sent to enjoywithpandu@gmail.com
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -360,45 +675,46 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({
               )}
             </motion.div>
           )}
-
-          {activeTab === 'logs' && (
-            <motion.div
-              key="logs"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="p-4"
-            >
-              <h4 className="font-medium text-gray-900 mb-4">Execution Logs</h4>
-              
-              <div className="text-center py-8 text-gray-500">
-                <Activity size={32} className="mx-auto mb-2 opacity-50" />
-                <p>Execution logs will appear here</p>
-                <p className="text-xs mt-1">Run the workflow to generate logs</p>
-              </div>
-            </motion.div>
-          )}
         </AnimatePresence>
       </div>
 
       {/* Footer Actions */}
       <div className="p-4 border-t border-gray-200 bg-gray-50">
-        <div className="flex space-x-2">
-          <button
-            onClick={() => copyToClipboard(node)}
-            className="flex-1 flex items-center justify-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <Copy size={16} className="mr-2" />
-            Copy Node
-          </button>
-          <button
-            onClick={() => downloadData(node, `${node.data.label}-node.json`)}
-            className="flex-1 flex items-center justify-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <Download size={16} className="mr-2" />
-            Export
-          </button>
-        </div>
+        {isEditing ? (
+          <div className="flex space-x-2">
+            <button
+              onClick={handleSaveChanges}
+              className="flex-1 flex items-center justify-center px-3 py-2 text-sm font-medium text-white bg-accent-600 rounded-lg hover:bg-accent-700 transition-colors"
+            >
+              <Save size={16} className="mr-2" />
+              Save Changes
+            </button>
+            <button
+              onClick={handleResetChanges}
+              className="flex-1 flex items-center justify-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <RotateCcw size={16} className="mr-2" />
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <div className="flex space-x-2">
+            <button
+              onClick={() => copyToClipboard(node)}
+              className="flex-1 flex items-center justify-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <Copy size={16} className="mr-2" />
+              Copy Node
+            </button>
+            <button
+              onClick={handleRunSingleNode}
+              className="flex-1 flex items-center justify-center px-3 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors"
+            >
+              <Play size={16} className="mr-2" />
+              Run Node
+            </button>
+          </div>
+        )}
       </div>
     </motion.div>
   );

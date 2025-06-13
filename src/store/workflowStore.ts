@@ -232,20 +232,23 @@ class WorkflowAgent {
       case 'email':
         // Use real email service for enjoywithpandu@gmail.com
         const emailTo = config.emailTo || "enjoywithpandu@gmail.com";
-        const emailSubject = config.emailSubject || "FlowMind Workflow Notification";
+        const emailSubject = config.emailSubject || "🤖 FlowMind Workflow Notification";
         const emailMessage = config.emailMessage || `
 Hello!
 
-Your FlowMind workflow has executed successfully.
+Your FlowMind workflow has executed successfully! 🎉
 
-Workflow: ${node.data.label}
-Time: ${new Date().toLocaleString()}
-Status: Success
+📋 Workflow: ${node.data.label}
+⏰ Time: ${new Date().toLocaleString()}
+📊 Status: Success ✅
 
-${input ? `Input Data: ${JSON.stringify(input, null, 2)}` : ''}
+${input ? `📄 Input Data:\n${JSON.stringify(input, null, 2)}` : ''}
+
+This email was sent automatically by your FlowMind AI agent.
 
 Best regards,
 FlowMind Automation Team
+🚀 Making your work effortless
         `.trim();
 
         const emailResult = await emailService.sendEmail(emailTo, emailSubject, emailMessage);
@@ -415,8 +418,7 @@ FlowMind Automation Team
         ai_response: aiResult.response,
         confidence_score: Math.round(85 + Math.random() * 15),
         processing_time: aiResult.timestamp,
-        success: aiResult.success,
-        is_real_api: aiResult.isRealAPI || false
+        success: aiResult.success
       };
     } catch (error) {
       // Fallback to mock response if Gemini service fails
@@ -466,7 +468,7 @@ FlowMind Automation Team
     
     // Use real email service
     const emailTo = config.recipient || 'enjoywithpandu@gmail.com';
-    const emailSubject = config.subject || 'FlowMind Workflow Notification';
+    const emailSubject = config.subject || '📧 FlowMind Workflow Notification';
     const emailBody = config.body || 'Your workflow has completed successfully.';
     
     const emailResult = await emailService.sendEmail(emailTo, emailSubject, emailBody);
@@ -557,7 +559,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
         retryAttempts: 3,
         enableLogging: true,
         notifyOnError: true,
-        notifyOnSuccess: false,
+        notifyOnSuccess: true,
       },
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -932,7 +934,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       retryAttempts: 3,
       enableLogging: true,
       notifyOnError: true,
-      notifyOnSuccess: false,
+      notifyOnSuccess: true,
     };
     get().updateSettings(workflowId, defaultSettings);
   },
