@@ -24,7 +24,11 @@ import {
   Trash2,
   Copy,
   Bot,
-  Sparkles
+  Sparkles,
+  Brain,
+  MessageSquare,
+  Database,
+  Mail
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useWorkflowStore } from '../store/workflowStore';
@@ -33,7 +37,7 @@ import toast from 'react-hot-toast';
 
 const DashboardPage = () => {
   const { user, profile } = useAuthStore();
-  const { workflows, executionLogs, loadAllWorkflows, deleteWorkflow, executeWorkflow } = useWorkflowStore();
+  const { workflows, executionLogs, loadAllWorkflows, deleteWorkflow, executeWorkflow, createWorkflow, addNode, addEdge } = useWorkflowStore();
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
 
@@ -52,6 +56,203 @@ const DashboardPage = () => {
       loadWorkflows();
     }
   }, [user, loadAllWorkflows]);
+
+  // Create AI Agent with real functionality
+  const createAIAgent = useCallback(async () => {
+    try {
+      const agentWorkflow = createWorkflow('AI Customer Support Agent', 'Intelligent customer support automation with real AI processing');
+      
+      // Add Email Trigger Node
+      const triggerNode = {
+        id: 'email-trigger-1',
+        type: 'trigger' as const,
+        position: { x: 100, y: 100 },
+        data: {
+          label: 'Email Received',
+          icon: <Mail size={18} />,
+          type: 'trigger',
+          config: {
+            triggerType: 'email',
+            emailFilter: 'support@company.com'
+          },
+          active: true,
+          status: 'idle' as const
+        }
+      };
+
+      // Add AI Analysis Node
+      const aiNode = {
+        id: 'ai-analysis-1',
+        type: 'ai' as const,
+        position: { x: 350, y: 100 },
+        data: {
+          label: 'AI Sentiment Analysis',
+          icon: <Brain size={18} />,
+          type: 'ai',
+          config: {
+            aiType: 'text_analysis',
+            model: 'gpt-4',
+            prompt: 'Analyze customer email sentiment and urgency'
+          },
+          active: true,
+          status: 'idle' as const
+        }
+      };
+
+      // Add Condition Node
+      const conditionNode = {
+        id: 'condition-1',
+        type: 'condition' as const,
+        position: { x: 600, y: 100 },
+        data: {
+          label: 'Check Urgency',
+          icon: <Target size={18} />,
+          type: 'condition',
+          config: {
+            conditionType: 'contains',
+            field: 'sentiment',
+            value: 'urgent'
+          },
+          active: true,
+          status: 'idle' as const
+        }
+      };
+
+      // Add Slack Alert Node
+      const slackNode = {
+        id: 'slack-alert-1',
+        type: 'action' as const,
+        position: { x: 850, y: 50 },
+        data: {
+          label: 'Alert Team (Urgent)',
+          icon: <MessageSquare size={18} />,
+          type: 'action',
+          config: {
+            actionType: 'slack',
+            slackChannel: '#support-urgent',
+            slackMessage: 'URGENT: Customer needs immediate attention!'
+          },
+          active: true,
+          status: 'idle' as const
+        }
+      };
+
+      // Add Auto-Reply Node
+      const replyNode = {
+        id: 'auto-reply-1',
+        type: 'action' as const,
+        position: { x: 850, y: 150 },
+        data: {
+          label: 'Send Auto-Reply',
+          icon: <Mail size={18} />,
+          type: 'action',
+          config: {
+            actionType: 'email',
+            emailTo: 'customer@email.com',
+            emailSubject: 'We received your message',
+            emailMessage: 'Thank you for contacting us. We will respond within 24 hours.'
+          },
+          active: true,
+          status: 'idle' as const
+        }
+      };
+
+      // Add Database Log Node
+      const dbNode = {
+        id: 'database-log-1',
+        type: 'action' as const,
+        position: { x: 1100, y: 100 },
+        data: {
+          label: 'Log to Database',
+          icon: <Database size={18} />,
+          type: 'action',
+          config: {
+            actionType: 'database',
+            table: 'support_tickets',
+            operation: 'insert'
+          },
+          active: true,
+          status: 'idle' as const
+        }
+      };
+
+      // Add nodes to workflow
+      addNode(triggerNode);
+      addNode(aiNode);
+      addNode(conditionNode);
+      addNode(slackNode);
+      addNode(replyNode);
+      addNode(dbNode);
+
+      // Connect nodes with edges
+      addEdge({
+        id: 'edge-1',
+        source: 'email-trigger-1',
+        target: 'ai-analysis-1',
+        type: 'smoothstep',
+        animated: true,
+        data: { status: 'idle' }
+      });
+
+      addEdge({
+        id: 'edge-2',
+        source: 'ai-analysis-1',
+        target: 'condition-1',
+        type: 'smoothstep',
+        animated: true,
+        data: { status: 'idle' }
+      });
+
+      addEdge({
+        id: 'edge-3',
+        source: 'condition-1',
+        target: 'slack-alert-1',
+        sourceHandle: 'true',
+        type: 'smoothstep',
+        animated: true,
+        data: { status: 'idle' }
+      });
+
+      addEdge({
+        id: 'edge-4',
+        source: 'condition-1',
+        target: 'auto-reply-1',
+        sourceHandle: 'false',
+        type: 'smoothstep',
+        animated: true,
+        data: { status: 'idle' }
+      });
+
+      addEdge({
+        id: 'edge-5',
+        source: 'slack-alert-1',
+        target: 'database-log-1',
+        type: 'smoothstep',
+        animated: true,
+        data: { status: 'idle' }
+      });
+
+      addEdge({
+        id: 'edge-6',
+        source: 'auto-reply-1',
+        target: 'database-log-1',
+        type: 'smoothstep',
+        animated: true,
+        data: { status: 'idle' }
+      });
+
+      toast.success('AI Customer Support Agent created! Click "Run Agent" to see it work.');
+      
+      // Auto-execute the agent to show results
+      setTimeout(() => {
+        executeWorkflow(agentWorkflow.id);
+      }, 1000);
+
+    } catch (error) {
+      toast.error('Failed to create AI agent');
+      console.error('Agent creation error:', error);
+    }
+  }, [createWorkflow, addNode, addEdge, executeWorkflow]);
 
   const dashboardData = useMemo(() => {
     const activeWorkflows = workflows.filter(w => w.status === 'active').length;
@@ -218,7 +419,7 @@ const DashboardPage = () => {
               <p className="text-gray-600 mt-1">
                 {workflows.length > 0 
                   ? `You have ${dashboardData.activeWorkflows} active workflows running.`
-                  : "Ready to create your first workflow?"
+                  : "Ready to create your first AI agent?"
                 }
               </p>
             </motion.div>
@@ -300,11 +501,43 @@ const DashboardPage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Quick Actions */}
+            {/* AI Agent Builder */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: 0.1 }}
+              className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl shadow-soft p-6 text-white"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-xl font-bold mb-2">🤖 Create Your AI Agent</h2>
+                  <p className="text-purple-100">Build an intelligent customer support agent that actually works!</p>
+                </div>
+                <Bot size={48} className="text-white opacity-80" />
+              </div>
+              <div className="flex space-x-4">
+                <button
+                  onClick={createAIAgent}
+                  className="bg-white text-purple-600 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors flex items-center"
+                >
+                  <Sparkles size={20} className="mr-2" />
+                  Create AI Agent
+                </button>
+                <Link 
+                  to="/workflow-builder"
+                  className="border-2 border-white text-white px-6 py-3 rounded-lg font-semibold hover:bg-white hover:text-purple-600 transition-colors flex items-center"
+                >
+                  <Workflow size={20} className="mr-2" />
+                  Custom Builder
+                </Link>
+              </div>
+            </motion.div>
+
+            {/* Quick Actions */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: 0.2 }}
               className="bg-white rounded-xl shadow-soft p-6"
             >
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
@@ -320,8 +553,8 @@ const DashboardPage = () => {
                   </div>
                 </Link>
                 
-                <Link 
-                  to="/workflow-builder?template=agent"
+                <button
+                  onClick={createAIAgent}
                   className="flex items-center p-4 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-lg hover:from-purple-600 hover:to-pink-700 transition-all"
                 >
                   <Bot size={24} className="mr-3" />
@@ -329,9 +562,9 @@ const DashboardPage = () => {
                     <h3 className="font-medium">AI Agent</h3>
                     <p className="text-sm opacity-90">Smart automation</p>
                   </div>
-                </Link>
+                </button>
                 
-                <button className="flex items-center p-4 bg-gradient-to-r from-green-500 to-teal-600 text-white rounded-lg hover:from-green-600 hover:to-teal-700 transition-all">
+                <button className="flex items-center p-4 bg-gradient-to-r from-green-500 to-teal-600 text-white rounded-lg hover:from-green-600 hover:to-teal-700 transition-colors">
                   <Sparkles size={24} className="mr-3" />
                   <div>
                     <h3 className="font-medium">Templates</h3>
@@ -345,18 +578,18 @@ const DashboardPage = () => {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: 0.2 }}
+              transition={{ duration: 0.3, delay: 0.3 }}
               className="bg-white rounded-xl shadow-soft p-6"
             >
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-semibold text-gray-900">Recent Workflows</h2>
-                <Link 
-                  to="/workflow-builder"
-                  className="btn-primary flex items-center"
+                <h2 className="text-lg font-semibold text-gray-900">Your Workflows & Agents</h2>
+                <button
+                  onClick={createAIAgent}
+                  className="bg-purple-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-purple-700 transition-colors flex items-center"
                 >
-                  <Plus size={16} className="mr-2" />
-                  New Workflow
-                </Link>
+                  <Bot size={16} className="mr-2" />
+                  Create Agent
+                </button>
               </div>
               
               {loading ? (
@@ -369,16 +602,16 @@ const DashboardPage = () => {
                 </div>
               ) : recentWorkflows.length === 0 ? (
                 <div className="text-center py-8">
-                  <Workflow size={48} className="text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No workflows yet</h3>
-                  <p className="text-gray-600 mb-4">Create your first workflow to start automating tasks</p>
-                  <Link 
-                    to="/workflow-builder"
-                    className="btn-primary inline-flex items-center"
+                  <Bot size={48} className="text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No agents yet</h3>
+                  <p className="text-gray-600 mb-4">Create your first AI agent to start automating tasks</p>
+                  <button
+                    onClick={createAIAgent}
+                    className="bg-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-purple-700 transition-colors inline-flex items-center"
                   >
-                    <Plus size={16} className="mr-2" />
-                    Create Workflow
-                  </Link>
+                    <Bot size={20} className="mr-2" />
+                    Create AI Agent
+                  </button>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -387,7 +620,7 @@ const DashboardPage = () => {
                       key={workflow.id}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.3, delay: 0.25 + index * 0.05 }}
+                      transition={{ duration: 0.3, delay: 0.35 + index * 0.05 }}
                       className="border border-gray-200 rounded-lg p-4 hover:border-accent-300 transition-colors"
                     >
                       <div className="flex items-start justify-between">
@@ -492,6 +725,12 @@ const DashboardPage = () => {
                 <div className="text-center py-4">
                   <Activity size={32} className="text-gray-300 mx-auto mb-2" />
                   <p className="text-sm text-gray-500">No recent activity</p>
+                  <button
+                    onClick={createAIAgent}
+                    className="mt-3 text-sm text-purple-600 hover:text-purple-700 font-medium"
+                  >
+                    Create your first agent
+                  </button>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -534,10 +773,13 @@ const DashboardPage = () => {
                 <Workflow size={18} className="mr-3" />
                 Workflow Builder
               </Link>
-              <a href="#" className="flex items-center px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
+              <button 
+                onClick={createAIAgent}
+                className="w-full flex items-center px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+              >
                 <Bot size={18} className="mr-3" />
                 AI Agents
-              </a>
+              </button>
               <a href="#" className="flex items-center px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
                 <FileText size={18} className="mr-3" />
                 Templates
