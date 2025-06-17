@@ -22,7 +22,9 @@ import {
   Filter,
   Workflow,
   Brain,
-  Settings
+  Settings,
+  Trash2,
+  RotateCcw
 } from 'lucide-react';
 import { useWorkflowStore } from '../../store/workflowStore';
 import toast from 'react-hot-toast';
@@ -71,11 +73,10 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ isOpen, onClose }) => {
   const { 
     currentWorkflow, 
     addNode, 
-    addEdge, 
-    createWorkflow, 
     executeWorkflow,
     nodes,
-    edges 
+    edges,
+    saveWorkflow
   } = useWorkflowStore();
 
   const scrollToBottom = () => {
@@ -131,19 +132,17 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ isOpen, onClose }) => {
     };
   };
 
-  const buildCustomerSupportWorkflow = () => {
-    if (!currentWorkflow) {
-      const workflow = createWorkflow('AI Customer Support', 'Intelligent customer support automation');
-    }
+  const buildEmailAutomationWorkflow = () => {
+    if (!currentWorkflow) return;
 
-    // Clear existing nodes
+    // Email trigger
     const triggerNode = {
       id: `trigger-${Date.now()}`,
       type: 'trigger' as const,
       position: { x: 100, y: 100 },
       data: {
         label: 'Email Received',
-        icon: 'Mail', // Store as string identifier
+        icon: 'Mail',
         type: 'trigger',
         config: { triggerType: 'email', emailFilter: 'support@company.com' },
         active: true,
@@ -151,43 +150,40 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ isOpen, onClose }) => {
       }
     };
 
+    // AI analysis
     const aiNode = {
       id: `ai-${Date.now()}`,
       type: 'ai' as const,
       position: { x: 350, y: 100 },
       data: {
-        label: 'AI Analysis',
-        icon: 'Brain', // Store as string identifier
+        label: 'AI Email Analysis',
+        icon: 'Brain',
         type: 'ai',
-        config: { aiType: 'text_analysis' },
+        config: { 
+          aiType: 'text_analysis',
+          model: 'gemini-pro',
+          prompt: 'Analyze email content for sentiment and urgency'
+        },
         active: true,
         status: 'idle' as const
       }
     };
 
-    const conditionNode = {
-      id: `condition-${Date.now()}`,
-      type: 'condition' as const,
-      position: { x: 600, y: 100 },
-      data: {
-        label: 'Check Urgency',
-        icon: 'Filter', // Store as string identifier
-        type: 'condition',
-        config: { conditionType: 'contains', field: 'sentiment', value: 'urgent' },
-        active: true,
-        status: 'idle' as const
-      }
-    };
-
-    const actionNode = {
+    // Auto-reply action
+    const replyNode = {
       id: `action-${Date.now()}`,
       type: 'action' as const,
-      position: { x: 850, y: 100 },
+      position: { x: 600, y: 100 },
       data: {
-        label: 'Send Response',
-        icon: 'Mail', // Store as string identifier
+        label: 'Send Auto-Reply',
+        icon: 'Mail',
         type: 'action',
-        config: { actionType: 'email' },
+        config: { 
+          actionType: 'email',
+          emailTo: 'enjoywithpandu@gmail.com',
+          emailSubject: 'Thank you for your email',
+          emailMessage: 'We have received your email and will respond within 24 hours.'
+        },
         active: true,
         status: 'idle' as const
       }
@@ -195,39 +191,90 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ isOpen, onClose }) => {
 
     addNode(triggerNode);
     addNode(aiNode);
-    addNode(conditionNode);
-    addNode(actionNode);
+    addNode(replyNode);
 
-    // Connect nodes
-    addEdge({
-      id: `edge-1-${Date.now()}`,
-      source: triggerNode.id,
-      target: aiNode.id,
-      type: 'smoothstep',
-      animated: true,
-      data: { status: 'idle' }
-    });
+    // Auto-save workflow
+    if (currentWorkflow) {
+      const updatedWorkflow = {
+        ...currentWorkflow,
+        nodes: [...nodes, triggerNode, aiNode, replyNode]
+      };
+      saveWorkflow(updatedWorkflow);
+    }
 
-    addEdge({
-      id: `edge-2-${Date.now()}`,
-      source: aiNode.id,
-      target: conditionNode.id,
-      type: 'smoothstep',
-      animated: true,
-      data: { status: 'idle' }
-    });
+    toast.success('Email automation workflow created!');
+  };
 
-    addEdge({
-      id: `edge-3-${Date.now()}`,
-      source: conditionNode.id,
-      target: actionNode.id,
-      sourceHandle: 'true',
-      type: 'smoothstep',
-      animated: true,
-      data: { status: 'idle' }
-    });
+  const buildDataProcessingWorkflow = () => {
+    if (!currentWorkflow) return;
 
-    toast.success('Customer support workflow created!');
+    // Webhook trigger
+    const triggerNode = {
+      id: `trigger-${Date.now()}`,
+      type: 'trigger' as const,
+      position: { x: 100, y: 100 },
+      data: {
+        label: 'Data Webhook',
+        icon: 'Webhook',
+        type: 'trigger',
+        config: { triggerType: 'webhook' },
+        active: true,
+        status: 'idle' as const
+      }
+    };
+
+    // AI processing
+    const aiNode = {
+      id: `ai-${Date.now()}`,
+      type: 'ai' as const,
+      position: { x: 350, y: 100 },
+      data: {
+        label: 'AI Data Processing',
+        icon: 'Brain',
+        type: 'ai',
+        config: { 
+          aiType: 'data_extraction',
+          model: 'gemini-pro',
+          prompt: 'Extract and analyze key insights from the data'
+        },
+        active: true,
+        status: 'idle' as const
+      }
+    };
+
+    // Database action
+    const dbNode = {
+      id: `action-${Date.now()}`,
+      type: 'action' as const,
+      position: { x: 600, y: 100 },
+      data: {
+        label: 'Store Results',
+        icon: 'Database',
+        type: 'action',
+        config: { 
+          actionType: 'database',
+          table: 'processed_data',
+          operation: 'insert'
+        },
+        active: true,
+        status: 'idle' as const
+      }
+    };
+
+    addNode(triggerNode);
+    addNode(aiNode);
+    addNode(dbNode);
+
+    // Auto-save workflow
+    if (currentWorkflow) {
+      const updatedWorkflow = {
+        ...currentWorkflow,
+        nodes: [...nodes, triggerNode, aiNode, dbNode]
+      };
+      saveWorkflow(updatedWorkflow);
+    }
+
+    toast.success('Data processing workflow created!');
   };
 
   const generateAIResponse = async (userMessage: string): Promise<Message> => {
@@ -260,7 +307,7 @@ ${workflowAnalysis.suggestions.map(s => `• ${s}`).join('\n')}`,
           }
         ] : [
           {
-            label: 'Add Trigger',
+            label: 'Add Email Trigger',
             action: () => {
               const node = {
                 id: `trigger-${Date.now()}`,
@@ -268,7 +315,7 @@ ${workflowAnalysis.suggestions.map(s => `• ${s}`).join('\n')}`,
                 position: { x: 100, y: 100 },
                 data: {
                   label: 'Email Trigger',
-                  icon: 'Mail', // Store as string identifier
+                  icon: 'Mail',
                   type: 'trigger',
                   config: { triggerType: 'email' },
                   active: true,
@@ -276,45 +323,11 @@ ${workflowAnalysis.suggestions.map(s => `• ${s}`).join('\n')}`,
                 }
               };
               addNode(node);
-              toast.success('Trigger node added!');
+              toast.success('Email trigger added!');
             },
-            icon: <Zap size={16} />,
+            icon: <Mail size={16} />,
             variant: 'secondary' as const
           }
-        ]
-      };
-    }
-
-    // Customer support workflow
-    if (lowerMessage.includes('customer') || lowerMessage.includes('support')) {
-      return {
-        id: Date.now().toString(),
-        type: 'assistant',
-        content: `🎯 **Customer Support Workflow**
-
-I'll help you build an intelligent customer support system that:
-
-1. **Receives emails** → Monitors support inbox
-2. **AI Analysis** → Analyzes sentiment & urgency  
-3. **Smart Routing** → Routes urgent vs normal requests
-4. **Auto Response** → Sends appropriate replies
-5. **Team Alerts** → Notifies team for urgent issues
-
-This workflow will handle customer emails automatically and provide real results!`,
-        timestamp: new Date(),
-        actionButtons: [
-          {
-            label: 'Build This Workflow',
-            action: buildCustomerSupportWorkflow,
-            icon: <Bot size={16} />,
-            variant: 'primary' as const
-          }
-        ],
-        suggestions: [
-          "What email filters should I use?",
-          "How does AI analysis work?",
-          "Show me the workflow steps",
-          "Add database logging"
         ]
       };
     }
@@ -326,47 +339,55 @@ This workflow will handle customer emails automatically and provide real results
         type: 'assistant',
         content: `📧 **Email Automation Workflow**
 
-Let me help you create an email automation system:
+I'll help you create an intelligent email automation system:
 
-**Trigger Options:**
-• New email received (Gmail, Outlook)
-• Schedule-based sending
-• Form submissions
-• Database updates
+**What it does:**
+1. **Monitors emails** → Watches your inbox for new messages
+2. **AI Analysis** → Analyzes content, sentiment, and urgency
+3. **Smart Responses** → Sends appropriate auto-replies
+4. **Real Processing** → Uses actual AI and sends real emails
 
-**AI Processing:**
-• Sentiment analysis
-• Content extraction
-• Priority detection
-• Auto-categorization
-
-**Actions:**
-• Send personalized replies
-• Forward to team members
-• Create support tickets
-• Update CRM records`,
+This workflow will handle customer emails automatically with real results!`,
         timestamp: new Date(),
         actionButtons: [
           {
-            label: 'Start Email Workflow',
-            action: () => {
-              const triggerNode = {
-                id: `email-trigger-${Date.now()}`,
-                type: 'trigger' as const,
-                position: { x: 100, y: 100 },
-                data: {
-                  label: 'Email Received',
-                  icon: 'Mail', // Store as string identifier
-                  type: 'trigger',
-                  config: { triggerType: 'email' },
-                  active: true,
-                  status: 'idle' as const
-                }
-              };
-              addNode(triggerNode);
-              toast.success('Email trigger added! Add more nodes to complete your workflow.');
-            },
+            label: 'Build Email Workflow',
+            action: buildEmailAutomationWorkflow,
             icon: <Mail size={16} />,
+            variant: 'primary' as const
+          }
+        ],
+        suggestions: [
+          "How does AI analysis work?",
+          "Can I customize the auto-reply?",
+          "Show me the workflow steps",
+          "Add more email actions"
+        ]
+      };
+    }
+
+    // Data processing
+    if (lowerMessage.includes('data') || lowerMessage.includes('process')) {
+      return {
+        id: Date.now().toString(),
+        type: 'assistant',
+        content: `📊 **Data Processing Pipeline**
+
+Let me create a powerful data processing workflow:
+
+**Features:**
+• **Webhook Trigger** → Receives data from any source
+• **AI Processing** → Extracts insights with Gemini AI
+• **Smart Storage** → Saves results to database
+• **Real-time Processing** → Handles data as it arrives
+
+Perfect for processing customer data, analytics, or any automated data pipeline!`,
+        timestamp: new Date(),
+        actionButtons: [
+          {
+            label: 'Build Data Pipeline',
+            action: buildDataProcessingWorkflow,
+            icon: <Database size={16} />,
             variant: 'primary' as const
           }
         ]
@@ -380,8 +401,8 @@ Let me help you create an email automation system:
         type: 'assistant',
         content: "I'll help you create custom JavaScript functions for your workflow:",
         timestamp: new Date(),
-        code: `// Customer Email Processor
-function processCustomerEmail(emailData) {
+        code: `// Email Processing Function
+function processIncomingEmail(emailData) {
   try {
     // Extract key information
     const analysis = {
@@ -392,29 +413,30 @@ function processCustomerEmail(emailData) {
       category: categorizeEmail(emailData.body)
     };
     
-    // Determine response type
+    // Determine response strategy
     if (analysis.urgency === 'high') {
       return {
         action: 'escalate',
         priority: 'urgent',
-        assignTo: 'senior-support',
-        autoReply: false
+        autoReply: true,
+        template: 'urgent-response'
       };
     } else {
       return {
         action: 'auto-reply',
         priority: 'normal',
         template: 'standard-response',
-        autoReply: true
+        delay: '5 minutes'
       };
     }
   } catch (error) {
+    console.error('Email processing error:', error);
     return { error: error.message };
   }
 }
 
 function detectUrgency(text) {
-  const urgentKeywords = ['urgent', 'asap', 'emergency', 'critical'];
+  const urgentKeywords = ['urgent', 'asap', 'emergency', 'critical', 'immediate'];
   return urgentKeywords.some(keyword => 
     text.toLowerCase().includes(keyword)
   ) ? 'high' : 'normal';
@@ -428,6 +450,63 @@ function detectUrgency(text) {
       };
     }
 
+    // Help with specific nodes
+    if (lowerMessage.includes('trigger') || lowerMessage.includes('start')) {
+      return {
+        id: Date.now().toString(),
+        type: 'assistant',
+        content: `🚀 **Trigger Nodes - Starting Your Workflow**
+
+Triggers are the starting point of every workflow. Here are your options:
+
+**📧 Email Trigger**
+• Monitors your inbox for new emails
+• Can filter by sender, subject, or content
+• Perfect for customer support automation
+
+**🔗 Webhook Trigger**
+• Receives data from external services
+• Real-time processing as data arrives
+• Great for API integrations
+
+**⏰ Schedule Trigger**
+• Runs workflows on a schedule
+• Daily, weekly, or custom timing
+• Perfect for reports and maintenance
+
+**⚡ Manual Trigger**
+• Start workflows manually
+• Great for testing and one-time tasks
+
+Which type of trigger would work best for your automation?`,
+        timestamp: new Date(),
+        actionButtons: [
+          {
+            label: 'Add Email Trigger',
+            action: () => {
+              const node = {
+                id: `trigger-${Date.now()}`,
+                type: 'trigger' as const,
+                position: { x: 100, y: 100 },
+                data: {
+                  label: 'Email Trigger',
+                  icon: 'Mail',
+                  type: 'trigger',
+                  config: { triggerType: 'email' },
+                  active: true,
+                  status: 'idle' as const
+                }
+              };
+              addNode(node);
+              toast.success('Email trigger added!');
+            },
+            icon: <Mail size={16} />,
+            variant: 'secondary' as const
+          }
+        ]
+      };
+    }
+
     // Default helpful response
     const responses = [
       {
@@ -436,7 +515,7 @@ function detectUrgency(text) {
 I can help you create powerful workflows for:
 
 **Popular Automations:**
-• Customer support systems
+• Customer support systems with AI
 • Email marketing campaigns  
 • Data processing pipelines
 • Social media automation
@@ -444,31 +523,31 @@ I can help you create powerful workflows for:
 
 **What I Can Do:**
 • Analyze your current workflow
-• Suggest improvements
-• Generate custom code
-• Guide you step-by-step
-• Test and debug workflows
+• Suggest improvements and optimizations
+• Generate custom JavaScript code
+• Guide you step-by-step through building
+• Test and debug your workflows
 
-What type of automation interests you most?`,
+What type of automation would you like to build today?`,
         suggestions: [
-          "Build customer support workflow",
-          "Create email automation",
-          "Set up data processing",
+          "Build email automation workflow",
+          "Create data processing pipeline",
+          "Set up customer support system",
           "Analyze my current workflow"
         ]
       },
       {
-        content: `🎯 **Workflow Building Made Easy**
+        content: `🎯 **Workflow Building Made Simple**
 
 I'll guide you through creating professional workflows:
 
 **Step 1:** Choose your trigger (Email, Webhook, Schedule)
-**Step 2:** Add AI processing for smart decisions
-**Step 3:** Set up conditions for routing
+**Step 2:** Add AI processing for intelligent decisions
+**Step 3:** Set up conditions for smart routing
 **Step 4:** Configure actions (Email, Slack, Database)
-**Step 5:** Test and deploy
+**Step 5:** Test and deploy with real results
 
-Ready to start? Tell me what you want to automate!`,
+Ready to start? Tell me what you want to automate and I'll help you build it!`,
         suggestions: [
           "Start with email trigger",
           "Add AI analysis node",
@@ -536,6 +615,21 @@ Ready to start? Tell me what you want to automate!`,
     }
   };
 
+  const clearChat = () => {
+    setMessages([{
+      id: '1',
+      type: 'assistant',
+      content: "👋 Chat cleared! How can I help you build your workflow?",
+      timestamp: new Date(),
+      suggestions: [
+        "Build a customer support workflow",
+        "Create an email automation",
+        "Set up a data processing pipeline",
+        "Automate social media posting"
+      ]
+    }]);
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -559,6 +653,15 @@ Ready to start? Tell me what you want to automate!`,
           </div>
         </div>
         <div className="flex items-center space-x-2">
+          {!isMinimized && (
+            <button
+              onClick={clearChat}
+              className="text-white hover:bg-white hover:bg-opacity-20 p-1 rounded transition-colors"
+              title="Clear chat"
+            >
+              <Trash2 size={16} />
+            </button>
+          )}
           <button
             onClick={() => setIsMinimized(!isMinimized)}
             className="text-white hover:bg-white hover:bg-opacity-20 p-1 rounded transition-colors"

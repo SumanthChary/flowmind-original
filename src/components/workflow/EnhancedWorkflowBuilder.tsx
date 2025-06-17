@@ -11,6 +11,8 @@ import ReactFlow, {
   ReactFlowProvider,
   ReactFlowInstance,
   NodeTypes,
+  useNodesState,
+  useEdgesState,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -46,7 +48,12 @@ import {
   Power,
   PowerOff,
   Copy,
-  Edit
+  Edit,
+  Download,
+  Upload,
+  Share,
+  Layers,
+  GitBranch
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -54,6 +61,7 @@ import TriggerNode from './nodes/TriggerNode';
 import ActionNode from './nodes/ActionNode';
 import ConditionNode from './nodes/ConditionNode';
 import DelayNode from './nodes/DelayNode';
+import AINode from './nodes/AINode';
 import NodeInspector from './NodeInspector';
 
 import { useWorkflowStore } from '../../store/workflowStore';
@@ -64,16 +72,19 @@ const nodeTypes: NodeTypes = {
   action: ActionNode,
   condition: ConditionNode,
   delay: DelayNode,
+  ai: AINode,
 };
 
 const nodeTemplates = [
+  // Triggers
   {
     id: 'email-trigger',
     type: 'trigger',
     label: 'Email Trigger',
     icon: 'Mail',
     description: 'Trigger when email is received',
-    category: 'Triggers'
+    category: 'Triggers',
+    config: { triggerType: 'email', emailFilter: '' }
   },
   {
     id: 'webhook-trigger',
@@ -81,7 +92,8 @@ const nodeTemplates = [
     label: 'Webhook',
     icon: 'Webhook',
     description: 'Trigger via HTTP webhook',
-    category: 'Triggers'
+    category: 'Triggers',
+    config: { triggerType: 'webhook', webhookUrl: '' }
   },
   {
     id: 'schedule-trigger',
@@ -89,15 +101,33 @@ const nodeTemplates = [
     label: 'Schedule',
     icon: 'Timer',
     description: 'Trigger on schedule',
-    category: 'Triggers'
+    category: 'Triggers',
+    config: { triggerType: 'schedule', schedule: '0 9 * * *' }
   },
+  {
+    id: 'manual-trigger',
+    type: 'trigger',
+    label: 'Manual Trigger',
+    icon: 'Zap',
+    description: 'Trigger manually',
+    category: 'Triggers',
+    config: { triggerType: 'manual' }
+  },
+  
+  // Actions
   {
     id: 'send-email-action',
     type: 'action',
     label: 'Send Email',
     icon: 'Mail',
     description: 'Send an email message',
-    category: 'Actions'
+    category: 'Actions',
+    config: { 
+      actionType: 'email', 
+      emailTo: 'enjoywithpandu@gmail.com',
+      emailSubject: 'FlowMind Notification',
+      emailMessage: 'Your workflow has completed successfully!'
+    }
   },
   {
     id: 'calendar-action',
@@ -105,7 +135,8 @@ const nodeTemplates = [
     label: 'Create Calendar Event',
     icon: 'Calendar',
     description: 'Create a calendar event',
-    category: 'Actions'
+    category: 'Actions',
+    config: { actionType: 'calendar', title: '', date: '', time: '' }
   },
   {
     id: 'slack-action',
@@ -113,7 +144,8 @@ const nodeTemplates = [
     label: 'Send Slack Message',
     icon: 'MessageSquare',
     description: 'Send message to Slack',
-    category: 'Actions'
+    category: 'Actions',
+    config: { actionType: 'slack', channel: '#general', message: '' }
   },
   {
     id: 'database-action',
@@ -121,7 +153,8 @@ const nodeTemplates = [
     label: 'Update Database',
     icon: 'Database',
     description: 'Update database record',
-    category: 'Actions'
+    category: 'Actions',
+    config: { actionType: 'database', table: '', operation: 'insert' }
   },
   {
     id: 'api-action',
@@ -129,23 +162,60 @@ const nodeTemplates = [
     label: 'API Call',
     icon: 'Globe',
     description: 'Make HTTP API request',
-    category: 'Actions'
+    category: 'Actions',
+    config: { actionType: 'api', url: '', method: 'POST' }
+  },
+  
+  // AI Nodes
+  {
+    id: 'ai-analysis',
+    type: 'ai',
+    label: 'AI Analysis',
+    icon: 'Brain',
+    description: 'AI text analysis and processing',
+    category: 'AI',
+    config: { 
+      aiType: 'text_analysis',
+      model: 'gemini-pro',
+      prompt: 'Analyze the input data and provide insights'
+    }
   },
   {
-    id: 'ai-action',
+    id: 'ai-sentiment',
     type: 'ai',
-    label: 'AI Processing',
+    label: 'Sentiment Analysis',
     icon: 'Brain',
-    description: 'AI analysis and processing',
-    category: 'AI'
+    description: 'Analyze sentiment of text',
+    category: 'AI',
+    config: { 
+      aiType: 'sentiment_analysis',
+      model: 'gemini-pro',
+      prompt: 'Analyze the sentiment of the following text'
+    }
   },
+  {
+    id: 'ai-extraction',
+    type: 'ai',
+    label: 'Data Extraction',
+    icon: 'Brain',
+    description: 'Extract data using AI',
+    category: 'AI',
+    config: { 
+      aiType: 'data_extraction',
+      model: 'gemini-pro',
+      prompt: 'Extract key information from the input'
+    }
+  },
+  
+  // Logic
   {
     id: 'if-condition',
     type: 'condition',
     label: 'If/Then',
     icon: 'Filter',
     description: 'Conditional logic',
-    category: 'Logic'
+    category: 'Logic',
+    config: { conditionType: 'equals', field: 'status', value: 'active' }
   },
   {
     id: 'delay-timer',
@@ -153,7 +223,8 @@ const nodeTemplates = [
     label: 'Delay',
     icon: 'Timer',
     description: 'Wait for specified time',
-    category: 'Logic'
+    category: 'Logic',
+    config: { duration: 1, unit: 'minutes' }
   }
 ];
 
@@ -168,6 +239,11 @@ const iconMap: Record<string, React.ReactNode> = {
   Globe: <Globe size={20} />,
   Brain: <Brain size={20} />,
   Filter: <Filter size={20} />,
+  Zap: <Zap size={20} />,
+  Code: <Code size={20} />,
+  FileText: <FileText size={20} />,
+  GitBranch: <GitBranch size={20} />,
+  Layers: <Layers size={20} />,
 };
 
 interface EnhancedWorkflowBuilderProps {
@@ -177,14 +253,6 @@ interface EnhancedWorkflowBuilderProps {
 
 const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflowBuilderProps) => {
   const { 
-    nodes, 
-    edges, 
-    setNodes, 
-    setEdges, 
-    addNode, 
-    addEdge: addWorkflowEdge,
-    deleteNode,
-    updateNode,
     currentWorkflow,
     isExecuting,
     executionProgress,
@@ -197,9 +265,14 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
     canRedo,
     saveWorkflow,
     selectedNodeId,
-    setSelectedNode
+    setSelectedNode,
+    addNode,
+    updateNode,
+    deleteNode
   } = useWorkflowStore();
   
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
   const [draggedTemplate, setDraggedTemplate] = useState<typeof nodeTemplates[0] | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -207,6 +280,7 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
   const [showAgentBuilder, setShowAgentBuilder] = useState(false);
   const [showNodeInspector, setShowNodeInspector] = useState(false);
   const [contextMenu, setContextMenu] = useState<{x: number, y: number, nodeId: string} | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -222,6 +296,14 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Sync with workflow store
+  useEffect(() => {
+    if (currentWorkflow) {
+      setNodes(currentWorkflow.nodes || []);
+      setEdges(currentWorkflow.edges || []);
+    }
+  }, [currentWorkflow, setNodes, setEdges]);
+
   // Get selected node for inspector
   const selectedNode = selectedNodeId ? nodes.find(n => n.id === selectedNodeId) : null;
 
@@ -234,10 +316,18 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
         animated: true,
         data: { status: 'idle' }
       };
-      setEdges(addEdge(newEdge, edges));
-      addWorkflowEdge(newEdge);
+      setEdges((eds) => addEdge(newEdge, eds));
+      
+      // Update workflow store
+      if (currentWorkflow) {
+        const updatedWorkflow = {
+          ...currentWorkflow,
+          edges: [...edges, newEdge]
+        };
+        saveWorkflow(updatedWorkflow);
+      }
     },
-    [edges, setEdges, addWorkflowEdge]
+    [edges, setEdges, currentWorkflow, saveWorkflow]
   );
 
   const onInit = (instance: ReactFlowInstance) => {
@@ -245,6 +335,7 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
   };
 
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+    event.stopPropagation();
     setSelectedNode(node.id);
     setShowNodeInspector(true);
     setContextMenu(null);
@@ -252,6 +343,7 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
 
   const onNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {
     event.preventDefault();
+    event.stopPropagation();
     setContextMenu({
       x: event.clientX,
       y: event.clientY,
@@ -283,25 +375,35 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
       });
 
       const newNode = {
-        id: `${draggedTemplate.id}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: `${draggedTemplate.type}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         type: draggedTemplate.type,
         position,
         data: {
           label: draggedTemplate.label,
-          icon: draggedTemplate.icon, // Store as string identifier
+          icon: draggedTemplate.icon,
           type: draggedTemplate.type,
-          config: {},
+          config: { ...draggedTemplate.config },
           active: true,
-          status: 'idle',
+          status: 'idle' as const,
         },
       };
 
-      setNodes([...nodes, newNode]);
+      setNodes((nds) => [...nds, newNode]);
       addNode(newNode);
       setDraggedTemplate(null);
+      
+      // Auto-save
+      if (currentWorkflow) {
+        const updatedWorkflow = {
+          ...currentWorkflow,
+          nodes: [...nodes, newNode]
+        };
+        saveWorkflow(updatedWorkflow);
+      }
+      
       toast.success(`${draggedTemplate.label} added to canvas`);
     },
-    [reactFlowInstance, draggedTemplate, nodes, setNodes, addNode]
+    [reactFlowInstance, draggedTemplate, nodes, setNodes, addNode, currentWorkflow, saveWorkflow]
   );
 
   const onDragStart = (event: React.DragEvent, template: typeof nodeTemplates[0]) => {
@@ -309,46 +411,93 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
     setDraggedTemplate(template);
   };
 
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     if (!reactFlowInstance || !currentWorkflow) return;
     
-    const flow = reactFlowInstance.toObject();
-    const updatedWorkflow = {
-      ...currentWorkflow,
-      nodes: flow.nodes,
-      edges: flow.edges,
-      viewport: flow.viewport,
-    };
+    setIsLoading(true);
     
-    saveWorkflow(updatedWorkflow);
-    onSave?.(updatedWorkflow);
-    toast.success('Workflow saved successfully!');
-  };
+    try {
+      const flow = reactFlowInstance.toObject();
+      const updatedWorkflow = {
+        ...currentWorkflow,
+        nodes: flow.nodes,
+        edges: flow.edges,
+        viewport: flow.viewport,
+        updatedAt: new Date().toISOString()
+      };
+      
+      saveWorkflow(updatedWorkflow);
+      onSave?.(updatedWorkflow);
+      toast.success('Workflow saved successfully!');
+    } catch (error) {
+      toast.error('Failed to save workflow');
+      console.error('Save error:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [reactFlowInstance, currentWorkflow, saveWorkflow, onSave]);
 
-  const handleRun = async () => {
+  const handleRun = useCallback(async () => {
     if (!currentWorkflow) return;
-    await executeWorkflow(currentWorkflow.id);
-  };
+    
+    try {
+      await executeWorkflow(currentWorkflow.id);
+    } catch (error) {
+      console.error('Execution error:', error);
+    }
+  }, [currentWorkflow, executeWorkflow]);
 
-  const handleDeleteNode = (nodeId: string) => {
+  const handleDeleteNode = useCallback((nodeId: string) => {
     const node = nodes.find(n => n.id === nodeId);
     if (node && confirm(`Delete "${node.data.label}"?`)) {
+      setNodes((nds) => nds.filter(n => n.id !== nodeId));
+      setEdges((eds) => eds.filter(e => e.source !== nodeId && e.target !== nodeId));
       deleteNode(nodeId);
       setContextMenu(null);
+      
+      // Auto-save
+      if (currentWorkflow) {
+        const updatedNodes = nodes.filter(n => n.id !== nodeId);
+        const updatedEdges = edges.filter(e => e.source !== nodeId && e.target !== nodeId);
+        const updatedWorkflow = {
+          ...currentWorkflow,
+          nodes: updatedNodes,
+          edges: updatedEdges
+        };
+        saveWorkflow(updatedWorkflow);
+      }
+      
       toast.success('Node deleted');
     }
-  };
+  }, [nodes, edges, setNodes, setEdges, deleteNode, currentWorkflow, saveWorkflow]);
 
-  const handleToggleNodeActive = (nodeId: string) => {
+  const handleToggleNodeActive = useCallback((nodeId: string) => {
     const node = nodes.find(n => n.id === nodeId);
     if (node) {
+      const updatedNode = {
+        ...node,
+        data: { ...node.data, active: !node.data.active }
+      };
+      
+      setNodes((nds) => nds.map(n => n.id === nodeId ? updatedNode : n));
       updateNode(nodeId, { active: !node.data.active });
       setContextMenu(null);
+      
+      // Auto-save
+      if (currentWorkflow) {
+        const updatedNodes = nodes.map(n => n.id === nodeId ? updatedNode : n);
+        const updatedWorkflow = {
+          ...currentWorkflow,
+          nodes: updatedNodes
+        };
+        saveWorkflow(updatedWorkflow);
+      }
+      
       toast.success(node.data.active ? 'Node deactivated' : 'Node activated');
     }
-  };
+  }, [nodes, setNodes, updateNode, currentWorkflow, saveWorkflow]);
 
-  const handleDuplicateNode = (nodeId: string) => {
+  const handleDuplicateNode = useCallback((nodeId: string) => {
     const node = nodes.find(n => n.id === nodeId);
     if (node) {
       const newNode = {
@@ -356,11 +505,46 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
         id: `${node.id}-copy-${Date.now()}`,
         position: { x: node.position.x + 50, y: node.position.y + 50 }
       };
+      
+      setNodes((nds) => [...nds, newNode]);
       addNode(newNode);
       setContextMenu(null);
+      
+      // Auto-save
+      if (currentWorkflow) {
+        const updatedWorkflow = {
+          ...currentWorkflow,
+          nodes: [...nodes, newNode]
+        };
+        saveWorkflow(updatedWorkflow);
+      }
+      
       toast.success('Node duplicated');
     }
-  };
+  }, [nodes, setNodes, addNode, currentWorkflow, saveWorkflow]);
+
+  const handleExportWorkflow = useCallback(() => {
+    if (!currentWorkflow) return;
+    
+    const exportData = {
+      workflow: currentWorkflow,
+      nodes,
+      edges,
+      exportedAt: new Date().toISOString(),
+      version: '1.0'
+    };
+    
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+    
+    const exportFileDefaultName = `${currentWorkflow.name.replace(/\s+/g, '-').toLowerCase()}-workflow.json`;
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+    
+    toast.success('Workflow exported successfully!');
+  }, [currentWorkflow, nodes, edges]);
 
   const groupedTemplates = nodeTemplates.reduce((acc, template) => {
     if (!acc[template.category]) {
@@ -425,10 +609,15 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
                 </button>
                 <button
                   onClick={handleSave}
-                  className="flex items-center justify-center px-3 py-2 bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-colors text-sm"
+                  disabled={isLoading}
+                  className="flex items-center justify-center px-3 py-2 bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-colors disabled:opacity-50 text-sm"
                 >
-                  <Save size={16} className="mr-1" />
-                  Save
+                  {isLoading ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-1"></div>
+                  ) : (
+                    <Save size={16} className="mr-1" />
+                  )}
+                  {isLoading ? 'Saving...' : 'Save'}
                 </button>
               </div>
               
@@ -451,11 +640,12 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
                   </div>
                 </div>
               ) : (
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-4 gap-2">
                   <button
                     onClick={undo}
                     disabled={!canUndo()}
                     className="flex items-center justify-center px-2 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 text-sm"
+                    title="Undo"
                   >
                     <RotateCcw size={16} />
                   </button>
@@ -463,14 +653,23 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
                     onClick={redo}
                     disabled={!canRedo()}
                     className="flex items-center justify-center px-2 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 text-sm"
+                    title="Redo"
                   >
                     <RotateCw size={16} />
                   </button>
                   <button
                     onClick={() => setShowAgentBuilder(true)}
                     className="flex items-center justify-center px-2 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm"
+                    title="AI Agent Builder"
                   >
                     <Bot size={16} />
+                  </button>
+                  <button
+                    onClick={handleExportWorkflow}
+                    className="flex items-center justify-center px-2 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                    title="Export Workflow"
+                  >
+                    <Download size={16} />
                   </button>
                 </div>
               )}
@@ -554,10 +753,11 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
               </button>
               <button
                 onClick={handleSave}
-                className="px-4 py-2 bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-colors text-sm"
+                disabled={isLoading}
+                className="px-4 py-2 bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-colors text-sm disabled:opacity-50"
               >
                 <Save size={16} className="mr-2" />
-                Save
+                {isLoading ? 'Saving...' : 'Save'}
               </button>
             </div>
           </div>
@@ -568,12 +768,8 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
           <ReactFlow
             nodes={nodes}
             edges={edges}
-            onNodesChange={(changes) => {
-              // Handle node changes
-            }}
-            onEdgesChange={(changes) => {
-              // Handle edge changes  
-            }}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onInit={onInit}
             onDrop={onDrop}
@@ -584,6 +780,8 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
             nodeTypes={nodeTypes}
             fitView
             className="bg-gray-50"
+            deleteKeyCode={['Backspace', 'Delete']}
+            multiSelectionKeyCode={['Meta', 'Ctrl']}
           >
             <Background 
               variant={BackgroundVariant.Dots} 
@@ -659,6 +857,27 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
         onClose={() => {
           setShowNodeInspector(false);
           setSelectedNode(null);
+        }}
+        onUpdate={(nodeId, updates) => {
+          const updatedNode = nodes.find(n => n.id === nodeId);
+          if (updatedNode) {
+            const newNode = {
+              ...updatedNode,
+              data: { ...updatedNode.data, ...updates }
+            };
+            setNodes((nds) => nds.map(n => n.id === nodeId ? newNode : n));
+            updateNode(nodeId, updates);
+            
+            // Auto-save
+            if (currentWorkflow) {
+              const updatedNodes = nodes.map(n => n.id === nodeId ? newNode : n);
+              const updatedWorkflow = {
+                ...currentWorkflow,
+                nodes: updatedNodes
+              };
+              saveWorkflow(updatedWorkflow);
+            }
+          }
         }}
       />
     </div>

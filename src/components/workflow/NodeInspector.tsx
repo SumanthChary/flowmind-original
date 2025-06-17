@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, 
@@ -31,21 +31,24 @@ interface NodeInspectorProps {
   node: WorkflowNode | null;
   isOpen: boolean;
   onClose: () => void;
+  onUpdate?: (nodeId: string, updates: Partial<WorkflowNode['data']>) => void;
 }
 
 const NodeInspector: React.FC<NodeInspectorProps> = ({ 
   node, 
   isOpen, 
-  onClose
+  onClose,
+  onUpdate
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'config' | 'output' | 'edit'>('overview');
   const [isEditing, setIsEditing] = useState(false);
   const [editedNode, setEditedNode] = useState<WorkflowNode | null>(null);
   const { updateNode, executeWorkflow, currentWorkflow } = useWorkflowStore();
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (node) {
       setEditedNode({ ...node });
+      setIsEditing(false);
     }
   }, [node]);
 
@@ -108,6 +111,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({
     if (!editedNode) return;
     
     updateNode(editedNode.id, editedNode.data);
+    onUpdate?.(editedNode.id, editedNode.data);
     setIsEditing(false);
     toast.success('Node updated successfully!');
   };
@@ -121,7 +125,6 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({
     if (!currentWorkflow || !node) return;
     
     try {
-      // Update node status to running
       updateNode(node.id, { status: 'running' });
       toast.info('Running node...');
       
@@ -159,6 +162,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({
         }
       }
     });
+    setIsEditing(true);
   };
 
   const updateNodeLabel = (label: string) => {
@@ -171,6 +175,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({
         label
       }
     });
+    setIsEditing(true);
   };
 
   const renderConfigEditor = () => {
@@ -215,6 +220,18 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({
                   value={config.webhookUrl || ''}
                   onChange={(e) => updateConfigValue('webhookUrl', e.target.value)}
                   placeholder="https://api.example.com/webhook"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500"
+                />
+              </div>
+            )}
+            {config.triggerType === 'schedule' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Schedule (Cron)</label>
+                <input
+                  type="text"
+                  value={config.schedule || '0 9 * * *'}
+                  onChange={(e) => updateConfigValue('schedule', e.target.value)}
+                  placeholder="0 9 * * * (daily at 9 AM)"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500"
                 />
               </div>
@@ -269,6 +286,83 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({
                     rows={4}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500"
                   />
+                </div>
+              </>
+            )}
+            {config.actionType === 'slack' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Slack Channel</label>
+                  <input
+                    type="text"
+                    value={config.slackChannel || '#general'}
+                    onChange={(e) => updateConfigValue('slackChannel', e.target.value)}
+                    placeholder="#general"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Message</label>
+                  <textarea
+                    value={config.slackMessage || ''}
+                    onChange={(e) => updateConfigValue('slackMessage', e.target.value)}
+                    placeholder="Workflow notification"
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500"
+                  />
+                </div>
+              </>
+            )}
+            {config.actionType === 'database' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Table Name</label>
+                  <input
+                    type="text"
+                    value={config.table || ''}
+                    onChange={(e) => updateConfigValue('table', e.target.value)}
+                    placeholder="users"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Operation</label>
+                  <select
+                    value={config.operation || 'insert'}
+                    onChange={(e) => updateConfigValue('operation', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500"
+                  >
+                    <option value="insert">Insert</option>
+                    <option value="update">Update</option>
+                    <option value="delete">Delete</option>
+                  </select>
+                </div>
+              </>
+            )}
+            {config.actionType === 'api' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">API URL</label>
+                  <input
+                    type="url"
+                    value={config.url || ''}
+                    onChange={(e) => updateConfigValue('url', e.target.value)}
+                    placeholder="https://api.example.com/endpoint"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Method</label>
+                  <select
+                    value={config.method || 'POST'}
+                    onChange={(e) => updateConfigValue('method', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500"
+                  >
+                    <option value="GET">GET</option>
+                    <option value="POST">POST</option>
+                    <option value="PUT">PUT</option>
+                    <option value="DELETE">DELETE</option>
+                  </select>
                 </div>
               </>
             )}
@@ -352,6 +446,35 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({
                 placeholder="urgent, high, positive"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500"
               />
+            </div>
+          </div>
+        );
+
+      case 'delay':
+        return (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Duration</label>
+              <input
+                type="number"
+                value={config.duration || 1}
+                onChange={(e) => updateConfigValue('duration', parseInt(e.target.value))}
+                min="1"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Unit</label>
+              <select
+                value={config.unit || 'minutes'}
+                onChange={(e) => updateConfigValue('unit', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500"
+              >
+                <option value="seconds">Seconds</option>
+                <option value="minutes">Minutes</option>
+                <option value="hours">Hours</option>
+                <option value="days">Days</option>
+              </select>
             </div>
           </div>
         );
@@ -563,10 +686,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({
                   <input
                     type="text"
                     value={editedNode?.data.label || ''}
-                    onChange={(e) => {
-                      updateNodeLabel(e.target.value);
-                      setIsEditing(true);
-                    }}
+                    onChange={(e) => updateNodeLabel(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500"
                   />
                 </div>
@@ -574,9 +694,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({
                 {/* Configuration */}
                 <div>
                   <h5 className="font-medium text-gray-900 mb-3">Configuration</h5>
-                  <div onClick={() => setIsEditing(true)}>
-                    {renderConfigEditor()}
-                  </div>
+                  {renderConfigEditor()}
                 </div>
               </div>
             </motion.div>

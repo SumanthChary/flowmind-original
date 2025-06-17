@@ -460,7 +460,7 @@ const FeaturesPage = () => {
                   <tr className="bg-gray-50">
                     <td className="px-6 py-4 text-sm text-gray-900">Testing Suite</td>
                     <td className="px-6 py-4 text-center"><CheckCircle size={20} className="text-success-500 mx-auto" /></td>
-                    <td className="px-6 py-4 text-center text-gray-400">Basic</td>
+                    <t className="px-6 py-4 text-center text-gray-400">Basic</td>
                     <td className="px-6 py-4 text-center text-gray-400">✗</td>
                     <td className="px-6 py-4 text-center text-gray-400">Basic</td>
                   </tr>
