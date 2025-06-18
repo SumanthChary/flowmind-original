@@ -246,6 +246,21 @@ const FeaturesPage = () => {
                 🔧 Custom Code Support
               </span>
             </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+              className="flex flex-col sm:flex-row gap-4 justify-center"
+            >
+              <Link to="/workflow-builder" className="bg-accent-600 text-white px-8 py-4 rounded-lg font-semibold hover:bg-accent-700 transition-colors inline-flex items-center justify-center">
+                Try Live Demo
+                <ArrowRight size={20} className="ml-2" />
+              </Link>
+              <Link to="/pricing" className="border-2 border-accent-600 text-accent-600 px-8 py-4 rounded-lg font-semibold hover:bg-accent-50 transition-colors">
+                View Pricing
+              </Link>
+            </motion.div>
           </div>
         </div>
       </section>
