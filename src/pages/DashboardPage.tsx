@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   Settings, 
   Bell, 
@@ -28,18 +28,42 @@ import {
   Brain,
   MessageSquare,
   Database,
-  Mail
+  Mail,
+  TestTube,
+  Shield,
+  Globe,
+  Code,
+  X
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useWorkflowStore } from '../store/workflowStore';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
+
+// Import feature components
+import CodeEditor from '../components/workflow/CodeEditor';
+import TestingSuite from '../components/workflow/TestingSuite';
+import AnalyticsDashboard from '../components/workflow/AnalyticsDashboard';
+import IntegrationsPanel from '../components/workflow/IntegrationsPanel';
+import SecurityPanel from '../components/workflow/SecurityPanel';
+import CollaborationPanel from '../components/workflow/CollaborationPanel';
 
 const DashboardPage = () => {
   const { user, profile } = useAuthStore();
   const { workflows, executionLogs, loadAllWorkflows, deleteWorkflow, executeWorkflow, createWorkflow, addNode, addEdge } = useWorkflowStore();
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+
+  // Feature panel states
+  const [showCodeEditor, setShowCodeEditor] = useState(false);
+  const [showTestingSuite, setShowTestingSuite] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showIntegrations, setShowIntegrations] = useState(false);
+  const [showSecurity, setShowSecurity] = useState(false);
+  const [showCollaboration, setShowCollaboration] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [showSchedule, setShowSchedule] = useState(false);
 
   useEffect(() => {
     document.title = "Dashboard | FlowMind";
@@ -69,7 +93,7 @@ const DashboardPage = () => {
         position: { x: 100, y: 100 },
         data: {
           label: 'Email Received',
-          icon: <Mail size={18} />,
+          icon: 'Mail',
           type: 'trigger',
           config: {
             triggerType: 'email',
@@ -87,7 +111,7 @@ const DashboardPage = () => {
         position: { x: 350, y: 100 },
         data: {
           label: 'AI Sentiment Analysis',
-          icon: <Brain size={18} />,
+          icon: 'Brain',
           type: 'ai',
           config: {
             aiType: 'text_analysis',
@@ -106,7 +130,7 @@ const DashboardPage = () => {
         position: { x: 600, y: 100 },
         data: {
           label: 'Check Urgency',
-          icon: <Target size={18} />,
+          icon: 'Target',
           type: 'condition',
           config: {
             conditionType: 'contains',
@@ -125,7 +149,7 @@ const DashboardPage = () => {
         position: { x: 850, y: 50 },
         data: {
           label: 'Alert Team (Urgent)',
-          icon: <MessageSquare size={18} />,
+          icon: 'MessageSquare',
           type: 'action',
           config: {
             actionType: 'slack',
@@ -144,7 +168,7 @@ const DashboardPage = () => {
         position: { x: 850, y: 150 },
         data: {
           label: 'Send Auto-Reply',
-          icon: <Mail size={18} />,
+          icon: 'Mail',
           type: 'action',
           config: {
             actionType: 'email',
@@ -164,7 +188,7 @@ const DashboardPage = () => {
         position: { x: 1100, y: 100 },
         data: {
           label: 'Log to Database',
-          icon: <Database size={18} />,
+          icon: 'Database',
           type: 'action',
           config: {
             actionType: 'database',
@@ -402,6 +426,141 @@ const DashboardPage = () => {
     return date.toLocaleDateString();
   };
 
+  // Templates Modal Component
+  const TemplatesModal = () => (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        className="bg-white rounded-xl shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col"
+      >
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <h2 className="text-xl font-bold text-gray-900">Workflow Templates</h2>
+          <button
+            onClick={() => setShowTemplates(false)}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[
+              {
+                name: 'Customer Support',
+                description: 'Automated customer support with AI analysis',
+                icon: <MessageSquare size={24} className="text-blue-600" />,
+                action: createAIAgent
+              },
+              {
+                name: 'Email Marketing',
+                description: 'Automated email campaigns and follow-ups',
+                icon: <Mail size={24} className="text-green-600" />,
+                action: () => toast.info('Email marketing template coming soon!')
+              },
+              {
+                name: 'Data Processing',
+                description: 'Process and analyze incoming data',
+                icon: <Database size={24} className="text-purple-600" />,
+                action: () => toast.info('Data processing template coming soon!')
+              },
+              {
+                name: 'Social Media',
+                description: 'Automate social media posting',
+                icon: <Globe size={24} className="text-orange-600" />,
+                action: () => toast.info('Social media template coming soon!')
+              },
+              {
+                name: 'E-commerce',
+                description: 'Order processing and inventory management',
+                icon: <Target size={24} className="text-red-600" />,
+                action: () => toast.info('E-commerce template coming soon!')
+              },
+              {
+                name: 'HR Automation',
+                description: 'Employee onboarding and management',
+                icon: <Users size={24} className="text-teal-600" />,
+                action: () => toast.info('HR automation template coming soon!')
+              }
+            ].map((template, index) => (
+              <div key={index} className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+                <div className="flex items-center mb-4">
+                  {template.icon}
+                  <h3 className="ml-3 font-semibold text-gray-900">{template.name}</h3>
+                </div>
+                <p className="text-gray-600 text-sm mb-4">{template.description}</p>
+                <button
+                  onClick={template.action}
+                  className="w-full bg-accent-600 text-white py-2 rounded-lg hover:bg-accent-700 transition-colors"
+                >
+                  Use Template
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+
+  // Schedule Modal Component
+  const ScheduleModal = () => (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        className="bg-white rounded-xl shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col"
+      >
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <h2 className="text-xl font-bold text-gray-900">Workflow Schedule</h2>
+          <button
+            onClick={() => setShowSchedule(false)}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="space-y-4">
+            {workflows.map((workflow) => (
+              <div key={workflow.id} className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-gray-900">{workflow.name}</h3>
+                    <p className="text-sm text-gray-600">Status: {workflow.status}</p>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Calendar size={16} className="text-gray-400" />
+                    <span className="text-sm text-gray-600">Manual trigger</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {workflows.length === 0 && (
+              <div className="text-center py-8">
+                <Calendar size={48} className="text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No Scheduled Workflows</h3>
+                <p className="text-gray-600">Create workflows with schedule triggers to see them here</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+
   return (
     <div className="min-h-screen bg-gray-50 pt-20">
       {/* Header */}
@@ -564,7 +723,10 @@ const DashboardPage = () => {
                   </div>
                 </button>
                 
-                <button className="flex items-center p-4 bg-gradient-to-r from-green-500 to-teal-600 text-white rounded-lg hover:from-green-600 hover:to-teal-700 transition-colors">
+                <button 
+                  onClick={() => setShowTemplates(true)}
+                  className="flex items-center p-4 bg-gradient-to-r from-green-500 to-teal-600 text-white rounded-lg hover:from-green-600 hover:to-teal-700 transition-colors"
+                >
                   <Sparkles size={24} className="mr-3" />
                   <div>
                     <h3 className="font-medium">Templates</h3>
@@ -765,11 +927,16 @@ const DashboardPage = () => {
               transition={{ duration: 0.3, delay: 0.2 }}
               className="bg-white rounded-xl shadow-soft p-4 space-y-1"
             >
-              <a href="#" className="flex items-center px-4 py-3 text-sm font-medium text-accent-600 bg-accent-50 rounded-lg transition-colors">
+              <button 
+                onClick={() => setActiveTab('overview')}
+                className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                  activeTab === 'overview' ? 'text-accent-600 bg-accent-50' : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
                 <BarChart2 size={18} className="mr-3" />
                 Overview
-              </a>
-              <Link to="/workflow-builder" className="flex items-center px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
+              </button>
+              <Link to="/workflow-builder" className="w-full flex items-center px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
                 <Workflow size={18} className="mr-3" />
                 Workflow Builder
               </Link>
@@ -780,26 +947,138 @@ const DashboardPage = () => {
                 <Bot size={18} className="mr-3" />
                 AI Agents
               </button>
-              <a href="#" className="flex items-center px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
+              <button 
+                onClick={() => setShowTemplates(true)}
+                className="w-full flex items-center px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+              >
                 <FileText size={18} className="mr-3" />
                 Templates
-              </a>
-              <a href="#" className="flex items-center px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
+              </button>
+              <button 
+                onClick={() => setShowSchedule(true)}
+                className="w-full flex items-center px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+              >
                 <Calendar size={18} className="mr-3" />
                 Schedule
-              </a>
-              <a href="#" className="flex items-center px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
+              </button>
+              <button 
+                onClick={() => setShowCollaboration(true)}
+                className="w-full flex items-center px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+              >
                 <Users size={18} className="mr-3" />
                 Team
-              </a>
-              <Link to="/profile" className="flex items-center px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
+              </button>
+              <Link to="/profile" className="w-full flex items-center px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
                 <Settings size={18} className="mr-3" />
                 Settings
               </Link>
             </motion.nav>
+
+            {/* Advanced Features */}
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3, delay: 0.25 }}
+              className="bg-white rounded-xl shadow-soft p-4"
+            >
+              <h3 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">
+                Advanced Features
+              </h3>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setShowCodeEditor(true)}
+                  className="flex items-center justify-center px-3 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors text-sm"
+                  title="Code Editor"
+                >
+                  <Code size={14} className="mr-1" />
+                  Code
+                </button>
+                <button
+                  onClick={() => setShowTestingSuite(true)}
+                  className="flex items-center justify-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                  title="Testing Suite"
+                >
+                  <TestTube size={14} className="mr-1" />
+                  Test
+                </button>
+                <button
+                  onClick={() => setShowAnalytics(true)}
+                  className="flex items-center justify-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                  title="Analytics"
+                >
+                  <BarChart2 size={14} className="mr-1" />
+                  Analytics
+                </button>
+                <button
+                  onClick={() => setShowIntegrations(true)}
+                  className="flex items-center justify-center px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm"
+                  title="Integrations"
+                >
+                  <Globe size={14} className="mr-1" />
+                  500+
+                </button>
+                <button
+                  onClick={() => setShowSecurity(true)}
+                  className="flex items-center justify-center px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+                  title="Security"
+                >
+                  <Shield size={14} className="mr-1" />
+                  Security
+                </button>
+                <button
+                  onClick={() => setShowCollaboration(true)}
+                  className="flex items-center justify-center px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm"
+                  title="Collaboration"
+                >
+                  <Users size={14} className="mr-1" />
+                  Team
+                </button>
+              </div>
+            </motion.div>
           </div>
         </div>
       </div>
+
+      {/* Feature Modals */}
+      <AnimatePresence>
+        {showTemplates && <TemplatesModal />}
+        {showSchedule && <ScheduleModal />}
+      </AnimatePresence>
+
+      {/* Feature Panels */}
+      <CodeEditor
+        isOpen={showCodeEditor}
+        onClose={() => setShowCodeEditor(false)}
+        onSave={(code) => {
+          console.log('Code saved:', code);
+          toast.success('Custom function saved!');
+        }}
+      />
+
+      <TestingSuite
+        isOpen={showTestingSuite}
+        onClose={() => setShowTestingSuite(false)}
+      />
+
+      <AnalyticsDashboard
+        isOpen={showAnalytics}
+        onClose={() => setShowAnalytics(false)}
+      />
+
+      <IntegrationsPanel
+        isOpen={showIntegrations}
+        onClose={() => setShowIntegrations(false)}
+      />
+
+      <SecurityPanel
+        isOpen={showSecurity}
+        onClose={() => setShowSecurity(false)}
+      />
+
+      <CollaborationPanel
+        isOpen={showCollaboration}
+        onClose={() => setShowCollaboration(false)}
+      />
     </div>
   );
 };
