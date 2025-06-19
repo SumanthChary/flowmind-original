@@ -53,7 +53,10 @@ import {
   Upload,
   Share,
   Layers,
-  GitBranch
+  GitBranch,
+  TestTube,
+  Shield,
+  Users
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -63,6 +66,12 @@ import ConditionNode from './nodes/ConditionNode';
 import DelayNode from './nodes/DelayNode';
 import AINode from './nodes/AINode';
 import NodeInspector from './NodeInspector';
+import CodeEditor from './CodeEditor';
+import TestingSuite from './TestingSuite';
+import AnalyticsDashboard from './AnalyticsDashboard';
+import IntegrationsPanel from './IntegrationsPanel';
+import SecurityPanel from './SecurityPanel';
+import CollaborationPanel from './CollaborationPanel';
 
 import { useWorkflowStore } from '../../store/workflowStore';
 import AgentBuilder from './AgentBuilder';
@@ -279,6 +288,12 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
   const [isMobile, setIsMobile] = useState(false);
   const [showAgentBuilder, setShowAgentBuilder] = useState(false);
   const [showNodeInspector, setShowNodeInspector] = useState(false);
+  const [showCodeEditor, setShowCodeEditor] = useState(false);
+  const [showTestingSuite, setShowTestingSuite] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showIntegrations, setShowIntegrations] = useState(false);
+  const [showSecurity, setShowSecurity] = useState(false);
+  const [showCollaboration, setShowCollaboration] = useState(false);
   const [contextMenu, setContextMenu] = useState<{x: number, y: number, nodeId: string} | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
@@ -675,6 +690,63 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
               )}
             </div>
 
+            {/* Feature Buttons */}
+            <div className="p-4 border-b border-gray-200">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">
+                Advanced Features
+              </h3>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setShowCodeEditor(true)}
+                  className="flex items-center justify-center px-3 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors text-sm"
+                  title="Code Editor"
+                >
+                  <Code size={14} className="mr-1" />
+                  Code
+                </button>
+                <button
+                  onClick={() => setShowTestingSuite(true)}
+                  className="flex items-center justify-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                  title="Testing Suite"
+                >
+                  <TestTube size={14} className="mr-1" />
+                  Test
+                </button>
+                <button
+                  onClick={() => setShowAnalytics(true)}
+                  className="flex items-center justify-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                  title="Analytics"
+                >
+                  <BarChart size={14} className="mr-1" />
+                  Analytics
+                </button>
+                <button
+                  onClick={() => setShowIntegrations(true)}
+                  className="flex items-center justify-center px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm"
+                  title="Integrations"
+                >
+                  <Globe size={14} className="mr-1" />
+                  500+
+                </button>
+                <button
+                  onClick={() => setShowSecurity(true)}
+                  className="flex items-center justify-center px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+                  title="Security"
+                >
+                  <Shield size={14} className="mr-1" />
+                  Security
+                </button>
+                <button
+                  onClick={() => setShowCollaboration(true)}
+                  className="flex items-center justify-center px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm"
+                  title="Collaboration"
+                >
+                  <Users size={14} className="mr-1" />
+                  Team
+                </button>
+              </div>
+            </div>
+
             {/* Node Templates */}
             <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
               {Object.entries(groupedTemplates).map(([category, templates]) => (
@@ -811,21 +883,21 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
               setShowNodeInspector(true);
               setContextMenu(null);
             }}
-            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
           >
             <Edit size={16} className="mr-2" />
             Edit Node
           </button>
           <button
             onClick={() => handleDuplicateNode(contextMenu.nodeId)}
-            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
           >
             <Copy size={16} className="mr-2" />
             Duplicate
           </button>
           <button
             onClick={() => handleToggleNodeActive(contextMenu.nodeId)}
-            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
           >
             {nodes.find(n => n.id === contextMenu.nodeId)?.data.active ? (
               <>
@@ -842,7 +914,7 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
           <hr className="my-1" />
           <button
             onClick={() => handleDeleteNode(contextMenu.nodeId)}
-            className="w-full text-left px-4 py-2 text-sm text-error-600 hover:bg-error-50 flex items-center"
+            className="w-full text-left px-4 py-2 text-sm text-error-600 hover:bg-error-50 transition-colors"
           >
             <Trash2 size={16} className="mr-2" />
             Delete
@@ -850,7 +922,7 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
         </div>
       )}
 
-      {/* Node Inspector */}
+      {/* Feature Panels */}
       <NodeInspector
         node={selectedNode}
         isOpen={showNodeInspector}
@@ -879,6 +951,40 @@ const EnhancedWorkflowBuilderContent = ({ workflowId, onSave }: EnhancedWorkflow
             }
           }
         }}
+      />
+
+      <CodeEditor
+        isOpen={showCodeEditor}
+        onClose={() => setShowCodeEditor(false)}
+        onSave={(code) => {
+          console.log('Code saved:', code);
+          toast.success('Custom function saved!');
+        }}
+      />
+
+      <TestingSuite
+        isOpen={showTestingSuite}
+        onClose={() => setShowTestingSuite(false)}
+      />
+
+      <AnalyticsDashboard
+        isOpen={showAnalytics}
+        onClose={() => setShowAnalytics(false)}
+      />
+
+      <IntegrationsPanel
+        isOpen={showIntegrations}
+        onClose={() => setShowIntegrations(false)}
+      />
+
+      <SecurityPanel
+        isOpen={showSecurity}
+        onClose={() => setShowSecurity(false)}
+      />
+
+      <CollaborationPanel
+        isOpen={showCollaboration}
+        onClose={() => setShowCollaboration(false)}
       />
     </div>
   );
