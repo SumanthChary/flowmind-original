@@ -2,6 +2,10 @@ import { create } from 'zustand';
 import { supabase, testConnection } from '../lib/supabase';
 import { geminiService } from '../services/geminiService';
 import { emailService } from '../services/emailService';
+import { workflowEngine } from '../services/workflowEngine';
+import { analyticsService } from '../services/analyticsService';
+import { testingService } from '../services/testingService';
+import { securityService } from '../services/securityService';
 
 export interface WorkflowNode {
   id: string;
@@ -9,7 +13,7 @@ export interface WorkflowNode {
   position: { x: number; y: number };
   data: {
     label: string;
-    icon?: string; // Changed from React.ReactNode to string to avoid serialization issues
+    icon?: string;
     type: string;
     config: any;
     active: boolean;
@@ -56,12 +60,16 @@ export interface Workflow {
     enableLogging: boolean;
     notifyOnError: boolean;
     notifyOnSuccess: boolean;
+    securityLevel: 'basic' | 'enhanced' | 'enterprise';
+    encryptionEnabled: boolean;
   };
   createdAt: string;
   updatedAt: string;
   status: 'draft' | 'active' | 'paused' | 'error';
   size?: number;
   created_by?: string;
+  analytics?: any;
+  security?: any;
 }
 
 interface WorkflowState {
@@ -75,6 +83,11 @@ interface WorkflowState {
   executionLogs: ExecutionLog[];
   history: { nodes: WorkflowNode[]; edges: WorkflowEdge[] }[];
   historyIndex: number;
+  
+  // Advanced features
+  analytics: any;
+  testResults: any;
+  securityScan: any;
   
   // Actions
   loadAllWorkflows: () => Promise<void>;
@@ -98,11 +111,17 @@ interface WorkflowState {
   deleteEdge: (id: string) => void;
   validateConnection: (connection: any) => boolean;
   
-  // Execution
+  // Enhanced execution
   executeWorkflow: (workflowId: string) => Promise<void>;
   pauseExecution: () => void;
   stopExecution: () => void;
   executeNodeChain: (nodeId: string, inputData: any, totalNodes: number, executedCount: number) => Promise<any>;
+  
+  // Advanced features
+  runTests: (workflowId: string) => Promise<any>;
+  runSecurityScan: (workflowId: string) => Promise<any>;
+  getAnalytics: (workflowId: string, timeRange?: string) => any;
+  exportWorkflow: (workflowId: string, format?: string) => any;
   
   // History
   undo: () => void;
@@ -121,452 +140,6 @@ interface WorkflowState {
   clearLogs: (workflowId: string) => void;
 }
 
-// Enhanced AI Agent for workflow execution with Gemini integration and real email sending
-class WorkflowAgent {
-  async executeNode(node: WorkflowNode, input: any): Promise<any> {
-    const startTime = Date.now();
-    
-    try {
-      let result;
-      
-      switch (node.type) {
-        case 'trigger':
-          result = await this.executeTrigger(node, input);
-          break;
-        case 'action':
-          result = await this.executeAction(node, input);
-          break;
-        case 'condition':
-          result = await this.executeCondition(node, input);
-          break;
-        case 'delay':
-          result = await this.executeDelay(node, input);
-          break;
-        case 'ai':
-          result = await this.executeAI(node, input);
-          break;
-        case 'webhook':
-          result = await this.executeWebhook(node, input);
-          break;
-        case 'email':
-          result = await this.executeEmail(node, input);
-          break;
-        case 'data':
-          result = await this.executeDataTransform(node, input);
-          break;
-        default:
-          // Instead of throwing error, return success with warning
-          result = {
-            warning: `Unknown node type: ${node.type}`,
-            executed: true,
-            nodeType: node.type,
-            fallbackExecution: true
-          };
-      }
-      
-      const duration = Date.now() - startTime;
-      
-      return {
-        success: true,
-        data: result,
-        duration,
-        timestamp: new Date().toISOString()
-      };
-    } catch (error) {
-      const duration = Date.now() - startTime;
-      
-      // Instead of failing, return a graceful error with success flag
-      return {
-        success: true, // Changed to true to prevent popup errors
-        data: {
-          error_handled: true,
-          error_message: error instanceof Error ? error.message : 'Unknown error',
-          node_type: node.type,
-          fallback_executed: true,
-          timestamp: new Date().toISOString()
-        },
-        duration,
-        timestamp: new Date().toISOString(),
-        graceful_failure: true
-      };
-    }
-  }
-  
-  private async executeTrigger(node: WorkflowNode, input: any): Promise<any> {
-    const { config } = node.data;
-    
-    switch (config.triggerType) {
-      case 'manual':
-        return { 
-          triggered: true, 
-          data: input || { 
-            message: "Manual trigger activated",
-            timestamp: new Date().toISOString(),
-            source: "user_action"
-          } 
-        };
-      case 'webhook':
-        return { 
-          triggered: true, 
-          webhook_url: `https://api.flowmind.ai/webhook/${node.id}`,
-          payload_received: {
-            headers: { "content-type": "application/json" },
-            body: input || { sample: "webhook data" },
-            timestamp: new Date().toISOString()
-          }
-        };
-      case 'schedule':
-        return { 
-          triggered: true, 
-          schedule: config.schedule || "0 9 * * *",
-          next_run: new Date(Date.now() + 60000).toISOString(),
-          current_execution: new Date().toISOString()
-        };
-      case 'email':
-        return { 
-          triggered: true, 
-          email_data: {
-            from: "customer@example.com",
-            to: config.emailFilter || "support@company.com",
-            subject: "Customer Support Request",
-            body: "I need help with my account settings. This is urgent.",
-            received_at: new Date().toISOString(),
-            attachments: 0
-          }
-        };
-      default:
-        return { triggered: true, type: config.triggerType };
-    }
-  }
-  
-  private async executeAction(node: WorkflowNode, input: any): Promise<any> {
-    const { config } = node.data;
-    
-    try {
-      switch (config.actionType) {
-        case 'email':
-          // Use real email service for enjoywithpandu@gmail.com
-          const emailTo = config.emailTo || "enjoywithpandu@gmail.com";
-          const emailSubject = config.emailSubject || "🤖 FlowMind Workflow Notification";
-          const emailMessage = config.emailMessage || `
-Hello!
-
-Your FlowMind workflow has executed successfully! 🎉
-
-📋 Workflow: ${node.data.label}
-⏰ Time: ${new Date().toLocaleString()}
-📊 Status: Success ✅
-
-${input ? `📄 Input Data:\n${JSON.stringify(input, null, 2)}` : ''}
-
-This email was sent automatically by your FlowMind AI agent.
-
-Best regards,
-FlowMind Automation Team
-🚀 Making your work effortless
-          `.trim();
-
-          const emailResult = await emailService.sendEmail(emailTo, emailSubject, emailMessage);
-          
-          return {
-            email_sent: true,
-            to: emailTo,
-            subject: emailSubject,
-            body: emailMessage,
-            message_id: emailResult.messageId,
-            sent_at: emailResult.sentAt,
-            delivery_status: emailResult.deliveryStatus,
-            real_email: emailResult.realEmail,
-            provider: emailResult.provider,
-            email_service_response: emailResult
-          };
-          
-        case 'slack':
-          return {
-            message_sent: true,
-            channel: config.slackChannel || "#support",
-            message: config.slackMessage || "New customer support request received - requires attention",
-            message_id: `slack_${Date.now()}`,
-            sent_at: new Date().toISOString(),
-            thread_ts: `${Date.now()}.000100`
-          };
-          
-        case 'database':
-          return {
-            record_updated: true,
-            table: config.table || 'support_tickets',
-            operation: config.operation || 'insert',
-            record_id: `ticket_${Date.now()}`,
-            affected_rows: 1,
-            data: {
-              status: "open",
-              priority: input?.urgency || "medium",
-              created_at: new Date().toISOString(),
-              customer_email: input?.email || "customer@example.com"
-            }
-          };
-          
-        case 'api':
-          return {
-            api_called: true,
-            endpoint: config.apiUrl || 'https://api.example.com/notifications',
-            method: config.method || 'POST',
-            status_code: 200,
-            response_time: Math.floor(Math.random() * 500) + 100,
-            response_data: {
-              success: true,
-              notification_id: `notif_${Date.now()}`,
-              message: "Notification sent successfully"
-            }
-          };
-          
-        default:
-          return { action_completed: true, type: config.actionType };
-      }
-    } catch (error) {
-      // Return graceful fallback instead of throwing
-      return {
-        action_completed: true,
-        fallback_mode: true,
-        error_handled: true,
-        original_error: error instanceof Error ? error.message : 'Unknown error',
-        type: config.actionType
-      };
-    }
-  }
-  
-  private async executeCondition(node: WorkflowNode, input: any): Promise<any> {
-    const { config } = node.data;
-    const field = config.field || 'status';
-    const value = config.value || 'active';
-    const conditionType = config.conditionType || 'equals';
-    
-    let result = false;
-    const inputValue = input?.[field] || input?.analysis?.[field];
-    
-    try {
-      switch (conditionType) {
-        case 'equals':
-          result = inputValue === value;
-          break;
-        case 'contains':
-          result = String(inputValue).toLowerCase().includes(value.toLowerCase());
-          break;
-        case 'greater':
-          result = Number(inputValue) > Number(value);
-          break;
-        case 'less':
-          result = Number(inputValue) < Number(value);
-          break;
-        case 'exists':
-          result = inputValue !== undefined && inputValue !== null;
-          break;
-        default:
-          result = false;
-      }
-    } catch (error) {
-      // Graceful fallback for condition evaluation
-      result = false;
-    }
-    
-    return {
-      condition_result: result,
-      field_checked: field,
-      expected_value: value,
-      actual_value: inputValue,
-      condition_type: conditionType,
-      evaluation_details: {
-        input_data: input,
-        comparison: `${inputValue} ${conditionType} ${value}`,
-        result: result ? "PASS" : "FAIL"
-      }
-    };
-  }
-  
-  private async executeDelay(node: WorkflowNode, input: any): Promise<any> {
-    const { config } = node.data;
-    const duration = config.duration || 1;
-    const unit = config.unit || 'seconds';
-    
-    let delayMs = duration * 1000; // Default to seconds
-    
-    switch (unit) {
-      case 'minutes':
-        delayMs = duration * 60 * 1000;
-        break;
-      case 'hours':
-        delayMs = duration * 60 * 60 * 1000;
-        break;
-      case 'days':
-        delayMs = duration * 24 * 60 * 60 * 1000;
-        break;
-    }
-    
-    // For demo, we'll simulate delay without actually waiting
-    return {
-      delay_completed: true,
-      duration: `${duration} ${unit}`,
-      delay_ms: delayMs,
-      started_at: new Date().toISOString(),
-      will_complete_at: new Date(Date.now() + delayMs).toISOString(),
-      input_data: input
-    };
-  }
-  
-  private async executeAI(node: WorkflowNode, input: any): Promise<any> {
-    const { config } = node.data;
-    
-    try {
-      // Use Gemini AI service for real AI processing
-      let prompt = '';
-      let context = input || {};
-      
-      switch (config.aiType) {
-        case 'text_analysis':
-          prompt = `Analyze the following customer communication for sentiment, urgency, and intent: ${JSON.stringify(context)}`;
-          break;
-        case 'sentiment_analysis':
-          prompt = `Perform detailed sentiment analysis on: ${JSON.stringify(context)}`;
-          break;
-        case 'data_extraction':
-          prompt = `Extract key information and insights from: ${JSON.stringify(context)}`;
-          break;
-        case 'content_generation':
-          prompt = `Generate appropriate content based on: ${JSON.stringify(context)}`;
-          break;
-        default:
-          prompt = config.prompt || `Process and analyze: ${JSON.stringify(context)}`;
-      }
-      
-      const aiResult = await geminiService.generateContent(prompt, config.model || 'gemini-pro');
-      
-      return {
-        ai_processed: true,
-        model_used: config.model || 'gemini-pro',
-        processing_type: config.aiType,
-        input_tokens: aiResult.usage?.promptTokens || 0,
-        output_tokens: aiResult.usage?.completionTokens || 0,
-        total_tokens: aiResult.usage?.totalTokens || 0,
-        ai_response: aiResult.response,
-        confidence_score: Math.round(85 + Math.random() * 15),
-        processing_time: aiResult.timestamp,
-        success: aiResult.success
-      };
-    } catch (error) {
-      // Fallback to mock response if Gemini service fails
-      return {
-        ai_processed: true,
-        model_used: 'gemini-pro-fallback',
-        processing_type: config.aiType,
-        ai_response: {
-          text: "AI processing completed with fallback service",
-          analysis: {
-            sentiment: "neutral",
-            confidence: 85,
-            insights: ["Processed successfully with backup AI service"]
-          }
-        },
-        fallback_used: true,
-        error_handled: true,
-        original_error: error instanceof Error ? error.message : 'Unknown error'
-      };
-    }
-  }
-  
-  private async executeWebhook(node: WorkflowNode, input: any): Promise<any> {
-    const { config } = node.data;
-    
-    // Simulate webhook call
-    return {
-      webhook_called: true,
-      url: config.webhookUrl || 'https://api.example.com/webhook',
-      method: config.method || 'POST',
-      status_code: 200,
-      response_time: Math.floor(Math.random() * 300) + 50,
-      request_headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'FlowMind-Agent/1.0'
-      },
-      payload_sent: input,
-      response_data: {
-        success: true,
-        message: "Webhook processed successfully",
-        webhook_id: `wh_${Date.now()}`
-      }
-    };
-  }
-  
-  private async executeEmail(node: WorkflowNode, input: any): Promise<any> {
-    const { config } = node.data;
-    
-    try {
-      // Use real email service
-      const emailTo = config.recipient || 'enjoywithpandu@gmail.com';
-      const emailSubject = config.subject || '📧 FlowMind Workflow Notification';
-      const emailBody = config.body || 'Your workflow has completed successfully.';
-      
-      const emailResult = await emailService.sendEmail(emailTo, emailSubject, emailBody);
-      
-      return {
-        email_processed: true,
-        action: config.emailAction || 'send',
-        recipient: emailTo,
-        subject: emailSubject,
-        delivery_status: emailResult.deliveryStatus,
-        message_id: emailResult.messageId,
-        sent_at: emailResult.sentAt,
-        email_data: {
-          from: "noreply@flowmind.ai",
-          to: emailTo,
-          subject: emailSubject,
-          body: emailBody,
-          attachments: config.attachments || []
-        },
-        email_service_response: emailResult
-      };
-    } catch (error) {
-      // Graceful email fallback
-      return {
-        email_processed: true,
-        fallback_mode: true,
-        error_handled: true,
-        recipient: config.recipient || 'enjoywithpandu@gmail.com',
-        subject: config.subject || 'FlowMind Notification',
-        original_error: error instanceof Error ? error.message : 'Unknown error'
-      };
-    }
-  }
-  
-  private async executeDataTransform(node: WorkflowNode, input: any): Promise<any> {
-    const { config } = node.data;
-    
-    let transformedData = { ...input };
-    
-    if (config.transformType === 'map') {
-      transformedData = {
-        ...transformedData,
-        mapped_at: new Date().toISOString(),
-        original_keys: Object.keys(input || {}),
-        transformed: true,
-        mapping_rules: config.mappingRules || "default",
-        output_format: "structured"
-      };
-    } else if (config.transformType === 'filter') {
-      transformedData = {
-        filtered_data: transformedData,
-        filter_applied: config.filterCondition || 'default',
-        items_remaining: Math.floor(Math.random() * 10) + 1,
-        items_filtered: Math.floor(Math.random() * 5),
-        filter_criteria: config.filterCriteria || "standard"
-      };
-    }
-    
-    return transformedData;
-  }
-}
-
-const workflowAgent = new WorkflowAgent();
-
 export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   workflows: [],
   currentWorkflow: null,
@@ -578,6 +151,9 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   executionLogs: [],
   history: [],
   historyIndex: -1,
+  analytics: null,
+  testResults: null,
+  securityScan: null,
 
   loadAllWorkflows: async () => {
     try {
@@ -588,7 +164,6 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       }
     } catch (error) {
       console.error('Error loading workflows:', error);
-      // Don't throw error, just log it
     }
   },
 
@@ -604,8 +179,10 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
         executionTimeout: 300000,
         retryAttempts: 3,
         enableLogging: true,
-        notifyOnError: false, // Changed to false to prevent error popups
+        notifyOnError: false,
         notifyOnSuccess: true,
+        securityLevel: 'enhanced',
+        encryptionEnabled: true,
       },
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -794,35 +371,21 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     set({ isExecuting: true, executionProgress: 0 });
 
     try {
-      // Find trigger nodes
-      const triggerNodes = nodes.filter(node => node.type === 'trigger' && node.data.active);
+      // Use enhanced workflow engine
+      const result = await workflowEngine.executeWorkflow(currentWorkflow, {});
       
-      if (triggerNodes.length === 0) {
-        // Instead of throwing error, create a default trigger
-        get().addLog({
-          workflowId,
-          nodeId: 'workflow',
-          status: 'warning',
-          message: 'No trigger nodes found, executing all active nodes',
-          duration: 0
-        });
-      }
+      // Record analytics
+      analyticsService.recordExecution(workflowId, {
+        success: result.success,
+        duration: result.duration,
+        nodesExecuted: result.results?.length || 0
+      });
 
-      let currentData = {};
-      const totalNodes = nodes.filter(n => n.data.active).length;
-      let executedNodes = 0;
-
-      // Execute workflow starting from triggers or all nodes if no triggers
-      const nodesToExecute = triggerNodes.length > 0 ? triggerNodes : nodes.filter(n => n.data.active).slice(0, 1);
-      
-      for (const startNode of nodesToExecute) {
-        try {
-          await get().executeNodeChain(startNode.id, currentData, totalNodes, executedNodes);
-        } catch (error) {
-          // Log error but continue execution
-          console.warn('Node chain execution warning:', error);
-        }
-      }
+      // Monitor for security threats
+      await securityService.monitorThreats(workflowId, {
+        executionCount: 1,
+        dataTransferred: JSON.stringify(result).length
+      });
 
       set({ isExecuting: false, executionProgress: 100 });
       
@@ -830,17 +393,18 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
         workflowId,
         nodeId: 'workflow',
         status: 'success',
-        message: 'Workflow executed successfully with real AI processing and email sending',
-        duration: 5000
+        message: 'Enhanced workflow executed successfully with advanced processing',
+        duration: result.duration
       });
 
       // Send notification email about successful execution
       try {
         if (currentWorkflow.settings.notifyOnSuccess) {
           await emailService.sendWorkflowNotification(currentWorkflow.name, 'Completed Successfully', {
-            totalNodes: totalNodes,
-            executionTime: '5 seconds',
-            timestamp: new Date().toISOString()
+            totalNodes: nodes.length,
+            executionTime: `${result.duration}ms`,
+            timestamp: new Date().toISOString(),
+            analytics: result.analytics
           });
         }
       } catch (emailError) {
@@ -850,88 +414,20 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     } catch (error) {
       set({ isExecuting: false, executionProgress: 0 });
       
-      // Log error but don't show popup
       get().addLog({
         workflowId,
         nodeId: 'workflow',
-        status: 'warning', // Changed from error to warning
+        status: 'warning',
         message: `Workflow completed with warnings: ${error instanceof Error ? error.message : 'Unknown error'}`
       });
 
-      // Don't send error notification to prevent popups
       console.warn('Workflow execution completed with warnings:', error);
     }
   },
 
   executeNodeChain: async (nodeId: string, inputData: any, totalNodes: number, executedCount: number) => {
-    const { nodes, edges, currentWorkflow } = get();
-    const node = nodes.find(n => n.id === nodeId);
-    
-    if (!node || !node.data.active || !currentWorkflow) return inputData;
-
-    // Update node status
-    get().updateNode(nodeId, { status: 'running' });
-
-    try {
-      // Execute the node with enhanced AI processing and real email sending
-      const result = await workflowAgent.executeNode(node, inputData);
-      
-      // Always treat as success (result.success is always true now)
-      get().updateNode(nodeId, { 
-        status: 'success',
-        lastExecuted: result.timestamp,
-        executionTime: result.duration,
-        output: result.data
-      });
-
-      get().addLog({
-        workflowId: currentWorkflow.id,
-        nodeId,
-        status: 'success',
-        message: `${node.data.label} executed successfully with real processing`,
-        duration: result.duration,
-        data: result.data
-      });
-
-      // Update progress
-      const progress = Math.round(((executedCount + 1) / totalNodes) * 100);
-      set({ executionProgress: progress });
-
-      // Find and execute next nodes
-      const outgoingEdges = edges.filter(edge => edge.source === nodeId);
-      let outputData = result.data;
-
-      for (const edge of outgoingEdges) {
-        // For condition nodes, check which path to take
-        if (node.type === 'condition') {
-          const conditionResult = result.data?.condition_result;
-          if (edge.sourceHandle === 'true' && !conditionResult) continue;
-          if (edge.sourceHandle === 'false' && conditionResult) continue;
-        }
-
-        try {
-          outputData = await get().executeNodeChain(edge.target, outputData, totalNodes, executedCount + 1);
-        } catch (error) {
-          console.warn('Node chain execution warning:', error);
-          // Continue with next edge instead of failing
-        }
-      }
-
-      return outputData;
-    } catch (error) {
-      // Mark as success with warning instead of error
-      get().updateNode(nodeId, { status: 'success' });
-      
-      get().addLog({
-        workflowId: currentWorkflow.id,
-        nodeId,
-        status: 'warning',
-        message: `${node.data.label} completed with warnings: ${error instanceof Error ? error.message : 'Unknown error'}`
-      });
-
-      // Return empty data and continue
-      return {};
-    }
+    // This method is now handled by the workflow engine
+    return inputData;
   },
 
   pauseExecution: () => {
@@ -941,7 +437,6 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   stopExecution: () => {
     set({ isExecuting: false, executionProgress: 0 });
     
-    // Reset all node statuses
     const { nodes } = get();
     const resetNodes = nodes.map(node => ({
       ...node,
@@ -950,12 +445,117 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     set({ nodes: resetNodes });
   },
 
+  // Advanced Features Implementation
+  runTests: async (workflowId: string) => {
+    const { currentWorkflow } = get();
+    if (!currentWorkflow) return null;
+
+    try {
+      // Create test suite if it doesn't exist
+      let testSuite = testingService.getTestSuite(workflowId);
+      if (!testSuite) {
+        testSuite = testingService.createTestSuite(workflowId, currentWorkflow);
+      }
+
+      // Run comprehensive tests
+      const results = await testingService.runTests(workflowId, ['unit', 'integration', 'performance']);
+      
+      set({ testResults: results });
+      
+      get().addLog({
+        workflowId,
+        nodeId: 'testing',
+        status: 'success',
+        message: `Testing completed: ${results.summary.passed}/${results.summary.totalTests} tests passed`,
+        data: results.summary
+      });
+
+      return results;
+    } catch (error) {
+      get().addLog({
+        workflowId,
+        nodeId: 'testing',
+        status: 'error',
+        message: `Testing failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      });
+      throw error;
+    }
+  },
+
+  runSecurityScan: async (workflowId: string) => {
+    const { currentWorkflow } = get();
+    if (!currentWorkflow) return null;
+
+    try {
+      const scanResult = await securityService.scanWorkflow(currentWorkflow);
+      
+      set({ securityScan: scanResult });
+      
+      get().addLog({
+        workflowId,
+        nodeId: 'security',
+        status: scanResult.vulnerabilities.length === 0 ? 'success' : 'warning',
+        message: `Security scan completed: ${scanResult.vulnerabilities.length} vulnerabilities found`,
+        data: {
+          securityScore: scanResult.securityScore,
+          vulnerabilities: scanResult.vulnerabilities.length
+        }
+      });
+
+      return scanResult;
+    } catch (error) {
+      get().addLog({
+        workflowId,
+        nodeId: 'security',
+        status: 'error',
+        message: `Security scan failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      });
+      throw error;
+    }
+  },
+
+  getAnalytics: (workflowId: string, timeRange: string = '24h') => {
+    try {
+      const analytics = analyticsService.getWorkflowAnalytics(workflowId, timeRange);
+      const insights = analyticsService.generateInsights(workflowId);
+      
+      set({ analytics: { ...analytics, insights } });
+      
+      return { ...analytics, insights };
+    } catch (error) {
+      console.error('Error getting analytics:', error);
+      return null;
+    }
+  },
+
+  exportWorkflow: (workflowId: string, format: string = 'json') => {
+    const { workflows } = get();
+    const workflow = workflows.find(w => w.id === workflowId);
+    
+    if (!workflow) return null;
+
+    const exportData = {
+      workflow,
+      analytics: analyticsService.exportAnalytics(workflowId, format as any),
+      testResults: testingService.exportTestResults(workflowId, format as any),
+      securityReport: securityService.generateSecurityReport(workflowId),
+      exportedAt: new Date().toISOString(),
+      version: '2.0'
+    };
+
+    if (format === 'json') {
+      return exportData;
+    }
+
+    // For other formats, convert to appropriate structure
+    return exportData;
+  },
+
   saveHistory: (nodes: WorkflowNode[], edges: WorkflowEdge[]) => {
     const { history, historyIndex } = get();
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push({ nodes: [...nodes], edges: [...edges] });
     
-    // Limit history to 50 entries
     if (newHistory.length > 50) {
       newHistory.shift();
     }
@@ -1018,8 +618,10 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       executionTimeout: 300000,
       retryAttempts: 3,
       enableLogging: true,
-      notifyOnError: false, // Changed to false
+      notifyOnError: false,
       notifyOnSuccess: true,
+      securityLevel: 'enhanced' as const,
+      encryptionEnabled: true,
     };
     get().updateSettings(workflowId, defaultSettings);
   },
@@ -1032,7 +634,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       timestamp: new Date().toISOString()
     };
     
-    const updatedLogs = [newLog, ...executionLogs].slice(0, 1000); // Keep last 1000 logs
+    const updatedLogs = [newLog, ...executionLogs].slice(0, 1000);
     set({ executionLogs: updatedLogs });
   },
 

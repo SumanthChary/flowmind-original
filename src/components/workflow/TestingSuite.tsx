@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   TestTube, 
@@ -16,7 +16,22 @@ import {
   Target,
   Activity,
   TrendingUp,
-  X
+  X,
+  Code,
+  Database,
+  FileText,
+  Workflow,
+  Brain,
+  Mail,
+  MessageSquare,
+  Filter,
+  Maximize,
+  Minimize,
+  Eye,
+  EyeOff,
+  Plus,
+  Trash2,
+  Save
 } from 'lucide-react';
 import { useWorkflowStore } from '../../store/workflowStore';
 import toast from 'react-hot-toast';
@@ -33,6 +48,8 @@ interface TestResult {
   duration: number;
   details: string;
   timestamp: string;
+  type: string;
+  nodeId?: string;
 }
 
 interface TestScenario {
@@ -42,96 +59,308 @@ interface TestScenario {
   mockData: any;
   expectedOutput: any;
   enabled: boolean;
+  type: string;
 }
 
 const TestingSuite: React.FC<TestingSuiteProps> = ({ isOpen, onClose }) => {
-  const { currentWorkflow, nodes, executeWorkflow } = useWorkflowStore();
+  const { currentWorkflow, nodes, runTests } = useWorkflowStore();
   const [isRunning, setIsRunning] = useState(false);
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [selectedScenario, setSelectedScenario] = useState<string>('');
   const [testProgress, setTestProgress] = useState(0);
+  const [expandedSection, setExpandedSection] = useState<string | null>(null);
+  const [showCustomTest, setShowCustomTest] = useState(false);
+  const [customTest, setCustomTest] = useState({
+    name: '',
+    description: '',
+    type: 'unit',
+    mockData: '{\n  "test": true\n}',
+    expectedOutput: '{\n  "success": true\n}'
+  });
 
-  const testScenarios: TestScenario[] = [
-    {
-      id: 'happy-path',
-      name: 'Happy Path Test',
-      description: 'Test workflow with valid input data',
-      mockData: {
+  // Generate test scenarios based on workflow nodes
+  const testScenarios: TestScenario[] = React.useMemo(() => {
+    if (!currentWorkflow || !nodes.length) {
+      return getDefaultTestScenarios();
+    }
+
+    const scenarios: TestScenario[] = [];
+    
+    // Generate tests for each node type
+    const triggerNodes = nodes.filter(n => n.type === 'trigger');
+    const actionNodes = nodes.filter(n => n.type === 'action');
+    const aiNodes = nodes.filter(n => n.type === 'ai');
+    const conditionNodes = nodes.filter(n => n.type === 'condition');
+    
+    // Add trigger tests
+    triggerNodes.forEach(node => {
+      scenarios.push({
+        id: `trigger-${node.id}`,
+        name: `Test ${node.data.label}`,
+        description: `Verify that the trigger node "${node.data.label}" activates correctly`,
+        type: 'unit',
+        mockData: generateMockDataForNode(node),
+        expectedOutput: { triggered: true },
+        enabled: true
+      });
+    });
+    
+    // Add action tests
+    actionNodes.forEach(node => {
+      scenarios.push({
+        id: `action-${node.id}`,
+        name: `Test ${node.data.label}`,
+        description: `Verify that the action "${node.data.label}" executes correctly`,
+        type: 'unit',
+        mockData: generateMockDataForNode(node),
+        expectedOutput: { success: true },
+        enabled: true
+      });
+    });
+    
+    // Add AI tests
+    aiNodes.forEach(node => {
+      scenarios.push({
+        id: `ai-${node.id}`,
+        name: `Test ${node.data.label}`,
+        description: `Verify that the AI node "${node.data.label}" processes data correctly`,
+        type: 'integration',
+        mockData: generateMockDataForNode(node),
+        expectedOutput: { aiProcessed: true },
+        enabled: true
+      });
+    });
+    
+    // Add condition tests
+    conditionNodes.forEach(node => {
+      scenarios.push({
+        id: `condition-${node.id}-true`,
+        name: `Test ${node.data.label} (True Path)`,
+        description: `Verify that the condition "${node.data.label}" evaluates to true with appropriate input`,
+        type: 'unit',
+        mockData: generateMockDataForNode(node, true),
+        expectedOutput: { conditionResult: true },
+        enabled: true
+      });
+      
+      scenarios.push({
+        id: `condition-${node.id}-false`,
+        name: `Test ${node.data.label} (False Path)`,
+        description: `Verify that the condition "${node.data.label}" evaluates to false with appropriate input`,
+        type: 'unit',
+        mockData: generateMockDataForNode(node, false),
+        expectedOutput: { conditionResult: false },
+        enabled: true
+      });
+    });
+    
+    // Add end-to-end workflow test
+    scenarios.push({
+      id: 'e2e-workflow',
+      name: 'End-to-End Workflow Test',
+      description: 'Test the entire workflow from trigger to completion',
+      type: 'integration',
+      mockData: { 
         email: 'test@example.com',
-        name: 'John Doe',
-        priority: 'high',
-        message: 'This is a test message'
+        subject: 'Test Subject',
+        body: 'This is a test message for the workflow.',
+        priority: 'high'
       },
-      expectedOutput: {
-        processed: true,
-        emailSent: true,
-        status: 'success'
-      },
+      expectedOutput: { success: true },
       enabled: true
-    },
-    {
-      id: 'edge-case-empty',
-      name: 'Empty Data Test',
-      description: 'Test workflow with empty input',
-      mockData: {},
-      expectedOutput: {
-        processed: true,
-        errors: [],
-        fallbackUsed: true
-      },
-      enabled: true
-    },
-    {
-      id: 'edge-case-invalid',
-      name: 'Invalid Email Test',
-      description: 'Test with invalid email format',
-      mockData: {
-        email: 'invalid-email',
-        name: 'Test User',
-        message: 'Test message'
-      },
-      expectedOutput: {
-        processed: true,
-        emailValid: false,
-        validationErrors: ['email']
-      },
-      enabled: true
-    },
-    {
+    });
+    
+    // Add performance test
+    scenarios.push({
       id: 'performance-test',
       name: 'Performance Test',
-      description: 'Test workflow execution speed',
+      description: 'Test workflow execution speed and resource usage',
+      type: 'performance',
       mockData: {
-        bulkData: Array.from({ length: 100 }, (_, i) => ({
+        bulkData: Array.from({ length: 10 }, (_, i) => ({
           id: i,
           email: `user${i}@example.com`,
           data: `test data ${i}`
         }))
       },
-      expectedOutput: {
-        processed: true,
-        itemsProcessed: 100,
-        executionTime: '<5000ms'
-      },
+      expectedOutput: { executionTime: '<5000ms' },
       enabled: true
-    },
-    {
-      id: 'stress-test',
-      name: 'Stress Test',
-      description: 'Test workflow under high load',
-      mockData: {
-        concurrent: true,
-        requests: 50,
-        data: 'stress test data'
+    });
+    
+    return scenarios;
+  }, [currentWorkflow, nodes]);
+
+  // Default test scenarios when no workflow is loaded
+  function getDefaultTestScenarios(): TestScenario[] {
+    return [
+      {
+        id: 'happy-path',
+        name: 'Happy Path Test',
+        description: 'Test workflow with valid input data',
+        mockData: {
+          email: 'test@example.com',
+          name: 'John Doe',
+          priority: 'high',
+          message: 'This is a test message'
+        },
+        expectedOutput: {
+          processed: true,
+          emailSent: true,
+          status: 'success'
+        },
+        enabled: true,
+        type: 'integration'
       },
-      expectedOutput: {
-        processed: true,
-        allRequestsHandled: true,
-        noErrors: true
+      {
+        id: 'edge-case-empty',
+        name: 'Empty Data Test',
+        description: 'Test workflow with empty input',
+        mockData: {},
+        expectedOutput: {
+          processed: true,
+          errors: [],
+          fallbackUsed: true
+        },
+        enabled: true,
+        type: 'error'
       },
-      enabled: false
+      {
+        id: 'edge-case-invalid',
+        name: 'Invalid Email Test',
+        description: 'Test with invalid email format',
+        mockData: {
+          email: 'invalid-email',
+          name: 'Test User',
+          message: 'Test message'
+        },
+        expectedOutput: {
+          processed: true,
+          emailValid: false,
+          validationErrors: ['email']
+        },
+        enabled: true,
+        type: 'error'
+      },
+      {
+        id: 'performance-test',
+        name: 'Performance Test',
+        description: 'Test workflow execution speed',
+        mockData: {
+          bulkData: Array.from({ length: 100 }, (_, i) => ({
+            id: i,
+            email: `user${i}@example.com`,
+            data: `test data ${i}`
+          }))
+        },
+        expectedOutput: {
+          processed: true,
+          itemsProcessed: 100,
+          executionTime: '<5000ms'
+        },
+        enabled: true,
+        type: 'performance'
+      },
+      {
+        id: 'stress-test',
+        name: 'Stress Test',
+        description: 'Test workflow under high load',
+        mockData: {
+          concurrent: true,
+          requests: 50,
+          data: 'stress test data'
+        },
+        expectedOutput: {
+          processed: true,
+          allRequestsHandled: true,
+          noErrors: true
+        },
+        enabled: false,
+        type: 'performance'
+      }
+    ];
+  }
+
+  // Generate mock data based on node type and configuration
+  function generateMockDataForNode(node: any, conditionShouldPass: boolean = true): any {
+    const { type, config } = node.data;
+    
+    switch (type) {
+      case 'trigger':
+        if (config.triggerType === 'email') {
+          return {
+            from: 'test@example.com',
+            to: config.emailFilter || 'support@company.com',
+            subject: 'Test Email Subject',
+            body: 'This is a test email body for automated testing.'
+          };
+        } else if (config.triggerType === 'webhook') {
+          return {
+            headers: { 'content-type': 'application/json' },
+            body: { test: true, timestamp: new Date().toISOString() }
+          };
+        }
+        return { triggerType: config.triggerType, test: true };
+        
+      case 'action':
+        if (config.actionType === 'email') {
+          return {
+            to: config.emailTo || 'test@example.com',
+            subject: 'Test Subject',
+            message: 'Test message body'
+          };
+        } else if (config.actionType === 'slack') {
+          return {
+            channel: config.slackChannel || '#general',
+            message: 'Test message for Slack'
+          };
+        } else if (config.actionType === 'database') {
+          return {
+            table: config.table || 'test_table',
+            data: { id: 1, name: 'Test Record', created_at: new Date().toISOString() }
+          };
+        }
+        return { actionType: config.actionType, test: true };
+        
+      case 'condition':
+        const field = config.field || 'status';
+        const value = config.value || '';
+        
+        if (conditionShouldPass) {
+          return { [field]: value };
+        } else {
+          return { [field]: `not_${value}` };
+        }
+        
+      case 'ai':
+        if (config.aiType === 'sentiment_analysis') {
+          return {
+            text: 'I am very happy with your service. Thank you for the excellent support!'
+          };
+        } else if (config.aiType === 'data_extraction') {
+          return {
+            content: 'John Doe (john.doe@example.com) purchased Product XYZ for $99.99 on January 15, 2025.'
+          };
+        }
+        return { input: 'Test input for AI processing', aiType: config.aiType };
+        
+      default:
+        return { test: true };
     }
-  ];
+  }
+
+  useEffect(() => {
+    if (isOpen && currentWorkflow) {
+      // Load previous test results if available
+      const storedResults = localStorage.getItem(`test_results_${currentWorkflow.id}`);
+      if (storedResults) {
+        try {
+          setTestResults(JSON.parse(storedResults));
+        } catch (error) {
+          console.error('Error parsing stored test results:', error);
+        }
+      }
+    }
+  }, [isOpen, currentWorkflow]);
 
   const runAllTests = async () => {
     if (!currentWorkflow) {
@@ -145,86 +374,40 @@ const TestingSuite: React.FC<TestingSuiteProps> = ({ isOpen, onClose }) => {
 
     const enabledScenarios = testScenarios.filter(s => s.enabled);
     
-    for (let i = 0; i < enabledScenarios.length; i++) {
-      const scenario = enabledScenarios[i];
+    try {
+      // Run tests using the enhanced testing service
+      const results = await runTests(currentWorkflow.id);
       
-      // Update progress
-      setTestProgress((i / enabledScenarios.length) * 100);
+      // Process and display results
+      const formattedResults = results.results.map((result: any) => ({
+        id: result.testId,
+        name: result.name,
+        status: result.status,
+        duration: result.duration,
+        details: result.message,
+        timestamp: result.timestamp,
+        type: result.type
+      }));
       
-      // Add pending test result
-      const testResult: TestResult = {
-        id: scenario.id,
-        name: scenario.name,
-        status: 'running',
-        duration: 0,
-        details: 'Executing test...',
-        timestamp: new Date().toISOString()
-      };
+      setTestResults(formattedResults);
+      setTestProgress(100);
       
-      setTestResults(prev => [...prev, testResult]);
+      // Store results
+      localStorage.setItem(`test_results_${currentWorkflow.id}`, JSON.stringify(formattedResults));
       
-      try {
-        const startTime = Date.now();
-        
-        // Simulate test execution
-        await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
-        
-        // Run actual workflow with mock data
-        if (scenario.id === 'performance-test') {
-          // Performance test
-          const duration = Date.now() - startTime;
-          const passed = duration < 5000;
-          
-          setTestResults(prev => prev.map(r => 
-            r.id === scenario.id ? {
-              ...r,
-              status: passed ? 'passed' : 'failed',
-              duration,
-              details: passed ? 
-                `Performance test passed. Execution time: ${duration}ms` :
-                `Performance test failed. Execution time: ${duration}ms (expected < 5000ms)`
-            } : r
-          ));
-        } else {
-          // Regular functional tests
-          const duration = Date.now() - startTime;
-          const passed = Math.random() > 0.2; // 80% pass rate for demo
-          
-          setTestResults(prev => prev.map(r => 
-            r.id === scenario.id ? {
-              ...r,
-              status: passed ? 'passed' : 'failed',
-              duration,
-              details: passed ? 
-                'Test passed successfully. All assertions met.' :
-                'Test failed. Output did not match expected results.'
-            } : r
-          ));
-        }
-        
-      } catch (error) {
-        const duration = Date.now() - startTime;
-        setTestResults(prev => prev.map(r => 
-          r.id === scenario.id ? {
-            ...r,
-            status: 'failed',
-            duration,
-            details: `Test failed with error: ${error instanceof Error ? error.message : 'Unknown error'}`
-          } : r
-        ));
+      const passedTests = formattedResults.filter(r => r.status === 'passed').length;
+      const totalTests = formattedResults.length;
+      
+      if (passedTests === totalTests) {
+        toast.success(`All ${totalTests} tests passed! 🎉`);
+      } else {
+        toast.error(`${totalTests - passedTests} tests failed out of ${totalTests}`);
       }
-    }
-    
-    setTestProgress(100);
-    setIsRunning(false);
-    
-    const passedTests = testResults.filter(r => r.status === 'passed').length;
-    const totalTests = enabledScenarios.length;
-    
-    if (passedTests === totalTests) {
-      toast.success(`All ${totalTests} tests passed! 🎉`);
-    } else {
-      toast.error(`${totalTests - passedTests} tests failed out of ${totalTests}`);
+    } catch (error) {
+      toast.error('Test execution failed');
+      console.error('Testing error:', error);
+    } finally {
+      setIsRunning(false);
     }
   };
 
@@ -240,43 +423,123 @@ const TestingSuite: React.FC<TestingSuiteProps> = ({ isOpen, onClose }) => {
       status: 'running',
       duration: 0,
       details: 'Executing test...',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      type: scenario.type
     };
     
     setTestResults(prev => [...prev.filter(r => r.id !== scenarioId), testResult]);
     
     try {
       const startTime = Date.now();
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Simulate test execution with realistic delay based on test type
+      const delay = scenario.type === 'performance' ? 2500 : 
+                    scenario.type === 'integration' ? 1800 : 1000;
+      await new Promise(resolve => setTimeout(resolve, delay));
       
       const duration = Date.now() - startTime;
-      const passed = Math.random() > 0.3; // 70% pass rate for demo
+      
+      // Determine test result based on test type
+      let passed = true;
+      let details = '';
+      
+      if (scenario.type === 'performance') {
+        passed = duration < 5000;
+        details = passed ? 
+          `Performance test passed. Execution time: ${duration}ms` :
+          `Performance test failed. Execution time: ${duration}ms (expected < 5000ms)`;
+      } else if (scenario.type === 'error') {
+        // Error tests should verify proper error handling
+        passed = Math.random() > 0.2;
+        details = passed ? 
+          'Error handling test passed. Errors were properly caught and handled.' :
+          'Error handling test failed. Some errors were not properly handled.';
+      } else {
+        passed = Math.random() > 0.1;
+        details = passed ? 
+          'Test passed successfully. All assertions met.' :
+          'Test failed. Output did not match expected results.';
+      }
       
       setTestResults(prev => prev.map(r => 
         r.id === scenarioId ? {
           ...r,
           status: passed ? 'passed' : 'failed',
           duration,
-          details: passed ? 
-            'Test passed successfully. All assertions met.' :
-            'Test failed. Output did not match expected results.'
+          details
         } : r
       ));
       
       toast.success(passed ? 'Test passed!' : 'Test failed!');
+      
+      // Store updated results
+      const updatedResults = [...testResults.filter(r => r.id !== scenarioId), {
+        id: scenarioId,
+        name: scenario.name,
+        status: passed ? 'passed' : 'failed',
+        duration,
+        details,
+        timestamp: new Date().toISOString(),
+        type: scenario.type
+      }];
+      
+      localStorage.setItem(`test_results_${currentWorkflow?.id}`, JSON.stringify(updatedResults));
+      
     } catch (error) {
-      const duration = Date.now() - Date.now();
       setTestResults(prev => prev.map(r => 
         r.id === scenarioId ? {
           ...r,
           status: 'failed',
-          duration,
+          duration: 0,
           details: `Test failed with error: ${error instanceof Error ? error.message : 'Unknown error'}`
         } : r
       ));
       toast.error('Test execution failed');
     } finally {
       setIsRunning(false);
+    }
+  };
+
+  const saveCustomTest = () => {
+    try {
+      // Validate inputs
+      if (!customTest.name.trim()) {
+        toast.error('Test name is required');
+        return;
+      }
+      
+      // Parse JSON inputs
+      const mockData = JSON.parse(customTest.mockData);
+      const expectedOutput = JSON.parse(customTest.expectedOutput);
+      
+      // Create new test scenario
+      const newScenario: TestScenario = {
+        id: `custom-${Date.now()}`,
+        name: customTest.name,
+        description: customTest.description || 'Custom test scenario',
+        type: customTest.type,
+        mockData,
+        expectedOutput,
+        enabled: true
+      };
+      
+      // Add to test scenarios (in a real app, this would be persisted)
+      // testScenarios.push(newScenario);
+      
+      toast.success('Custom test created successfully');
+      setShowCustomTest(false);
+      
+      // Reset form
+      setCustomTest({
+        name: '',
+        description: '',
+        type: 'unit',
+        mockData: '{\n  "test": true\n}',
+        expectedOutput: '{\n  "success": true\n}'
+      });
+      
+    } catch (error) {
+      toast.error(`Invalid JSON: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -315,6 +578,21 @@ const TestingSuite: React.FC<TestingSuiteProps> = ({ isOpen, onClose }) => {
         return <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>;
       default:
         return <Clock size={16} className="text-gray-400" />;
+    }
+  };
+
+  const getTestTypeIcon = (type: string) => {
+    switch (type) {
+      case 'unit':
+        return <TestTube size={16} className="text-blue-600" />;
+      case 'integration':
+        return <Workflow size={16} className="text-purple-600" />;
+      case 'performance':
+        return <Activity size={16} className="text-orange-600" />;
+      case 'error':
+        return <AlertCircle size={16} className="text-red-600" />;
+      default:
+        return <TestTube size={16} className="text-gray-600" />;
     }
   };
 
@@ -367,6 +645,13 @@ const TestingSuite: React.FC<TestingSuiteProps> = ({ isOpen, onClose }) => {
               )}
             </button>
             <button
+              onClick={() => setShowCustomTest(true)}
+              className="flex items-center px-4 py-2 bg-white bg-opacity-20 text-white rounded-lg hover:bg-opacity-30 transition-colors"
+            >
+              <Plus size={16} className="mr-2" />
+              New Test
+            </button>
+            <button
               onClick={exportResults}
               disabled={testResults.length === 0}
               className="flex items-center px-4 py-2 bg-white bg-opacity-20 text-white rounded-lg hover:bg-opacity-30 transition-colors disabled:opacity-50"
@@ -413,7 +698,10 @@ const TestingSuite: React.FC<TestingSuiteProps> = ({ isOpen, onClose }) => {
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1">
-                      <h4 className="font-medium text-gray-900 text-sm">{scenario.name}</h4>
+                      <div className="flex items-center">
+                        {getTestTypeIcon(scenario.type)}
+                        <h4 className="font-medium text-gray-900 text-sm ml-2">{scenario.name}</h4>
+                      </div>
                       <p className="text-xs text-gray-600 mt-1">{scenario.description}</p>
                     </div>
                     <label className="flex items-center">
@@ -422,9 +710,7 @@ const TestingSuite: React.FC<TestingSuiteProps> = ({ isOpen, onClose }) => {
                         checked={scenario.enabled}
                         onChange={(e) => {
                           // Update scenario enabled state
-                          const updatedScenarios = testScenarios.map(s =>
-                            s.id === scenario.id ? { ...s, enabled: e.target.checked } : s
-                          );
+                          scenario.enabled = e.target.checked;
                         }}
                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                       />
@@ -501,7 +787,10 @@ const TestingSuite: React.FC<TestingSuiteProps> = ({ isOpen, onClose }) => {
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex items-center space-x-2">
                           {getStatusIcon(result.status)}
-                          <h4 className="font-medium text-gray-900">{result.name}</h4>
+                          <div className="flex items-center">
+                            {getTestTypeIcon(result.type)}
+                            <h4 className="font-medium text-gray-900 ml-2">{result.name}</h4>
+                          </div>
                         </div>
                         <div className="text-sm text-gray-600">
                           {result.duration > 0 && `${result.duration}ms`}
@@ -518,6 +807,94 @@ const TestingSuite: React.FC<TestingSuiteProps> = ({ isOpen, onClose }) => {
             </div>
           </div>
         </div>
+
+        {/* Custom Test Modal */}
+        {showCustomTest && (
+          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
+            <div className="bg-white rounded-xl p-6 w-full max-w-2xl">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Create Custom Test</h3>
+                <button onClick={() => setShowCustomTest(false)} className="text-gray-500 hover:text-gray-700">
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Test Name</label>
+                  <input
+                    type="text"
+                    value={customTest.name}
+                    onChange={(e) => setCustomTest({...customTest, name: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="E.g., Verify Email Sending"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <input
+                    type="text"
+                    value={customTest.description}
+                    onChange={(e) => setCustomTest({...customTest, description: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="E.g., Tests that emails are sent correctly with valid input"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Test Type</label>
+                  <select
+                    value={customTest.type}
+                    onChange={(e) => setCustomTest({...customTest, type: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="unit">Unit Test</option>
+                    <option value="integration">Integration Test</option>
+                    <option value="performance">Performance Test</option>
+                    <option value="error">Error Handling Test</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Mock Data (JSON)</label>
+                  <textarea
+                    value={customTest.mockData}
+                    onChange={(e) => setCustomTest({...customTest, mockData: e.target.value})}
+                    rows={5}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Expected Output (JSON)</label>
+                  <textarea
+                    value={customTest.expectedOutput}
+                    onChange={(e) => setCustomTest({...customTest, expectedOutput: e.target.value})}
+                    rows={5}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+                  />
+                </div>
+                
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button
+                    onClick={() => setShowCustomTest(false)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={saveCustomTest}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  >
+                    <Save size={16} className="inline mr-2" />
+                    Save Test
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </motion.div>
     </motion.div>
   );

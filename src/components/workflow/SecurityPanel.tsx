@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Shield, 
@@ -19,8 +19,20 @@ import {
   Globe,
   Database,
   Wifi,
-  Smartphone
+  Smartphone,
+  Scan,
+  Search,
+  Zap,
+  Maximize,
+  Minimize,
+  ArrowRight,
+  HelpCircle,
+  ShieldOff,
+  ShieldCheck,
+  FileCheck,
+  FileLock2
 } from 'lucide-react';
+import { useWorkflowStore } from '../../store/workflowStore';
 import toast from 'react-hot-toast';
 
 interface SecurityPanelProps {
@@ -46,9 +58,37 @@ interface AuditLog {
   status: 'success' | 'warning' | 'error';
 }
 
+interface Vulnerability {
+  id: string;
+  type: string;
+  severity: 'high' | 'medium' | 'low';
+  description: string;
+  location: string;
+  recommendation: string;
+}
+
 const SecurityPanel: React.FC<SecurityPanelProps> = ({ isOpen, onClose }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'access' | 'audit' | 'compliance'>('overview');
+  const { currentWorkflow, runSecurityScan } = useWorkflowStore();
+  const [activeTab, setActiveTab] = useState<'overview' | 'access' | 'audit' | 'compliance' | 'scan'>('overview');
   const [showApiKey, setShowApiKey] = useState(false);
+  const [expandedSection, setExpandedSection] = useState<string | null>(null);
+  const [scanResults, setScanResults] = useState<any>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [securityScore, setSecurityScore] = useState(85);
+
+  // Load security scan results when panel opens
+  useEffect(() => {
+    if (isOpen && currentWorkflow) {
+      const storedResults = localStorage.getItem(`security_scan_${currentWorkflow.id}`);
+      if (storedResults) {
+        try {
+          setScanResults(JSON.parse(storedResults));
+        } catch (error) {
+          console.error('Error parsing stored security scan results:', error);
+        }
+      }
+    }
+  }, [isOpen, currentWorkflow]);
 
   const securityFeatures: SecurityFeature[] = [
     {
@@ -201,6 +241,33 @@ const SecurityPanel: React.FC<SecurityPanelProps> = ({ isOpen, onClose }) => {
     }
   ];
 
+  const vulnerabilities: Vulnerability[] = scanResults?.vulnerabilities || [
+    {
+      id: 'vuln-1',
+      type: 'sensitive_data_exposure',
+      severity: 'high',
+      description: 'API key found in workflow configuration',
+      location: 'Node: "API Call" (id: action-123)',
+      recommendation: 'Use environment variables for sensitive data'
+    },
+    {
+      id: 'vuln-2',
+      type: 'insecure_connection',
+      severity: 'medium',
+      description: 'Insecure HTTP connection detected',
+      location: 'Node: "Webhook" (id: webhook-456)',
+      recommendation: 'Use HTTPS for all external connections'
+    },
+    {
+      id: 'vuln-3',
+      type: 'missing_validation',
+      severity: 'low',
+      description: 'Input data not validated before processing',
+      location: 'Node: "Process Data" (id: data-789)',
+      recommendation: 'Add input validation to prevent injection attacks'
+    }
+  ];
+
   const generateApiKey = () => {
     const newKey = 'sk_live_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
     toast.success('New API key generated successfully!');
@@ -226,6 +293,34 @@ const SecurityPanel: React.FC<SecurityPanelProps> = ({ isOpen, onClose }) => {
     toast.success('Audit log exported successfully!');
   };
 
+  const runScan = async () => {
+    if (!currentWorkflow) {
+      toast.error('No workflow selected');
+      return;
+    }
+
+    setIsScanning(true);
+    setActiveTab('scan');
+
+    try {
+      // Run security scan using the enhanced security service
+      const results = await runSecurityScan(currentWorkflow.id);
+      
+      setScanResults(results);
+      setSecurityScore(results.securityScore || 85);
+      
+      // Store results
+      localStorage.setItem(`security_scan_${currentWorkflow.id}`, JSON.stringify(results));
+      
+      toast.success(`Security scan completed with score: ${results.securityScore}/100`);
+    } catch (error) {
+      toast.error('Security scan failed');
+      console.error('Security scan error:', error);
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'success':
@@ -236,6 +331,27 @@ const SecurityPanel: React.FC<SecurityPanelProps> = ({ isOpen, onClose }) => {
         return <AlertCircle size={16} className="text-red-600" />;
       default:
         return <CheckCircle size={16} className="text-gray-400" />;
+    }
+  };
+
+  const getSeverityColor = (severity: string) => {
+    switch (severity) {
+      case 'high':
+        return 'text-red-600 bg-red-50 border-red-200';
+      case 'medium':
+        return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+      case 'low':
+        return 'text-blue-600 bg-blue-50 border-blue-200';
+      default:
+        return 'text-gray-600 bg-gray-50 border-gray-200';
+    }
+  };
+
+  const toggleSectionExpansion = (section: string) => {
+    if (expandedSection === section) {
+      setExpandedSection(null);
+    } else {
+      setExpandedSection(section);
     }
   };
 
@@ -266,6 +382,23 @@ const SecurityPanel: React.FC<SecurityPanelProps> = ({ isOpen, onClose }) => {
             </div>
           </div>
           <div className="flex items-center space-x-2">
+            <button
+              onClick={runScan}
+              disabled={isScanning}
+              className="flex items-center px-4 py-2 bg-white text-red-600 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+            >
+              {isScanning ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600 mr-2"></div>
+                  Scanning...
+                </>
+              ) : (
+                <>
+                  <Scan size={16} className="mr-2" />
+                  Scan Workflow
+                </>
+              )}
+            </button>
             <div className="flex items-center space-x-1 text-white text-sm">
               <div className="w-2 h-2 bg-green-400 rounded-full"></div>
               <span>All systems secure</span>
@@ -283,6 +416,7 @@ const SecurityPanel: React.FC<SecurityPanelProps> = ({ isOpen, onClose }) => {
         <div className="flex border-b border-gray-200">
           {[
             { id: 'overview', label: 'Security Overview', icon: <Shield size={16} /> },
+            { id: 'scan', label: 'Vulnerability Scan', icon: <Scan size={16} /> },
             { id: 'access', label: 'Access Control', icon: <Key size={16} /> },
             { id: 'audit', label: 'Audit Logs', icon: <FileText size={16} /> },
             { id: 'compliance', label: 'Compliance', icon: <CheckCircle size={16} /> }
@@ -325,6 +459,88 @@ const SecurityPanel: React.FC<SecurityPanelProps> = ({ isOpen, onClose }) => {
                 </div>
               </div>
 
+              {/* Security Score */}
+              <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Security Score</h3>
+                  <button
+                    onClick={() => toggleSectionExpansion('securityScore')}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    {expandedSection === 'securityScore' ? <Minimize size={18} /> : <Maximize size={18} />}
+                  </button>
+                </div>
+                
+                <div className="flex items-center justify-center mb-4">
+                  <div className="relative w-40 h-40">
+                    <svg className="w-full h-full" viewBox="0 0 100 100">
+                      <circle 
+                        cx="50" 
+                        cy="50" 
+                        r="45" 
+                        fill="none" 
+                        stroke="#e5e7eb" 
+                        strokeWidth="10" 
+                      />
+                      <circle 
+                        cx="50" 
+                        cy="50" 
+                        r="45" 
+                        fill="none" 
+                        stroke={securityScore > 80 ? "#10b981" : securityScore > 60 ? "#f59e0b" : "#ef4444"} 
+                        strokeWidth="10" 
+                        strokeDasharray="283"
+                        strokeDashoffset={283 - (283 * securityScore / 100)}
+                        transform="rotate(-90 50 50)"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-3xl font-bold text-gray-900">{securityScore}</div>
+                        <div className="text-sm text-gray-600">/100</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className={`grid grid-cols-1 md:grid-cols-3 gap-4 ${
+                  expandedSection === 'securityScore' ? '' : 'hidden md:grid'
+                }`}>
+                  <div className="bg-gray-50 rounded-lg p-3 text-center">
+                    <div className="text-sm font-medium text-gray-700">Encryption</div>
+                    <div className="text-lg font-semibold text-green-600">100%</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3 text-center">
+                    <div className="text-sm font-medium text-gray-700">Access Control</div>
+                    <div className="text-lg font-semibold text-green-600">95%</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3 text-center">
+                    <div className="text-sm font-medium text-gray-700">Vulnerability</div>
+                    <div className="text-lg font-semibold text-yellow-600">78%</div>
+                  </div>
+                </div>
+                
+                {expandedSection === 'securityScore' && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <h4 className="font-medium text-gray-900 mb-2">Recommendations</h4>
+                    <ul className="space-y-2">
+                      <li className="flex items-start">
+                        <ArrowRight size={16} className="text-blue-600 mt-0.5 mr-2 flex-shrink-0" />
+                        <span className="text-sm text-gray-700">Enable two-factor authentication for all users</span>
+                      </li>
+                      <li className="flex items-start">
+                        <ArrowRight size={16} className="text-blue-600 mt-0.5 mr-2 flex-shrink-0" />
+                        <span className="text-sm text-gray-700">Use environment variables for API keys and credentials</span>
+                      </li>
+                      <li className="flex items-start">
+                        <ArrowRight size={16} className="text-blue-600 mt-0.5 mr-2 flex-shrink-0" />
+                        <span className="text-sm text-gray-700">Implement input validation for all workflow triggers</span>
+                      </li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+
               {/* Security Features */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {securityFeatures.map((feature) => (
@@ -359,10 +575,228 @@ const SecurityPanel: React.FC<SecurityPanelProps> = ({ isOpen, onClose }) => {
             </div>
           )}
 
+          {activeTab === 'scan' && (
+            <div className="space-y-6">
+              {/* Scan Controls */}
+              <div className="bg-white border border-gray-200 rounded-xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Vulnerability Scanner</h3>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={runScan}
+                      disabled={isScanning}
+                      className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                    >
+                      {isScanning ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Scanning...
+                        </>
+                      ) : (
+                        <>
+                          <Scan size={16} className="mr-2" />
+                          Start Scan
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+                
+                {scanResults ? (
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <div className="text-sm text-gray-600">Last scan: {new Date(scanResults.timestamp || Date.now()).toLocaleString()}</div>
+                        <div className="text-sm text-gray-600">Scan duration: {scanResults.duration || 1250}ms</div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="text-sm font-medium text-gray-700">Security Score:</div>
+                        <div className={`px-2 py-1 rounded-full text-sm font-medium ${
+                          securityScore >= 90 ? 'bg-green-100 text-green-800' :
+                          securityScore >= 70 ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          {securityScore}/100
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-medium text-gray-900">Vulnerabilities Found: {vulnerabilities.length}</h4>
+                        <button
+                          onClick={() => toggleSectionExpansion('vulnerabilities')}
+                          className="text-gray-500 hover:text-gray-700"
+                        >
+                          {expandedSection === 'vulnerabilities' ? <Minimize size={16} /> : <Maximize size={16} />}
+                        </button>
+                      </div>
+                      
+                      {vulnerabilities.length > 0 ? (
+                        <div className={`space-y-3 ${
+                          expandedSection === 'vulnerabilities' ? 'max-h-96 overflow-y-auto' : 'max-h-60 overflow-y-auto'
+                        }`}>
+                          {vulnerabilities.map((vuln) => (
+                            <div 
+                              key={vuln.id} 
+                              className={`p-4 border rounded-lg ${getSeverityColor(vuln.severity)}`}
+                            >
+                              <div className="flex items-start">
+                                <div className="flex-shrink-0 mt-0.5">
+                                  {vuln.severity === 'high' ? (
+                                    <AlertCircle size={16} className="text-red-600" />
+                                  ) : vuln.severity === 'medium' ? (
+                                    <AlertCircle size={16} className="text-yellow-600" />
+                                  ) : (
+                                    <HelpCircle size={16} className="text-blue-600" />
+                                  )}
+                                </div>
+                                <div className="ml-3 flex-1">
+                                  <div className="flex items-center justify-between">
+                                    <h5 className="font-medium text-gray-900">{vuln.type.replace(/_/g, ' ')}</h5>
+                                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${
+                                      vuln.severity === 'high' ? 'bg-red-100 text-red-800' :
+                                      vuln.severity === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                                      'bg-blue-100 text-blue-800'
+                                    }`}>
+                                      {vuln.severity}
+                                    </span>
+                                  </div>
+                                  <p className="text-sm text-gray-700 mt-1">{vuln.description}</p>
+                                  <div className="text-xs text-gray-500 mt-1">Location: {vuln.location}</div>
+                                  <div className="mt-2 text-sm text-gray-700">
+                                    <span className="font-medium">Recommendation:</span> {vuln.recommendation}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-6 bg-gray-50 rounded-lg">
+                          <ShieldCheck size={32} className="text-green-500 mx-auto mb-2" />
+                          <p className="text-gray-700">No vulnerabilities found!</p>
+                          <p className="text-sm text-gray-500 mt-1">Your workflow is secure</p>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-medium text-gray-900">Recommendations</h4>
+                        <button
+                          onClick={() => toggleSectionExpansion('recommendations')}
+                          className="text-gray-500 hover:text-gray-700"
+                        >
+                          {expandedSection === 'recommendations' ? <Minimize size={16} /> : <Maximize size={16} />}
+                        </button>
+                      </div>
+                      
+                      <div className={`space-y-3 ${
+                        expandedSection === 'recommendations' ? 'max-h-96 overflow-y-auto' : ''
+                      }`}>
+                        {(scanResults.recommendations || []).map((rec: any, index: number) => (
+                          <div key={index} className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                            <div className="flex items-start">
+                              <div className="flex-shrink-0 mt-0.5">
+                                <Lightbulb size={16} className="text-blue-600" />
+                              </div>
+                              <div className="ml-3">
+                                <h5 className="font-medium text-gray-900">{rec.title}</h5>
+                                <p className="text-sm text-gray-700 mt-1">{rec.description}</p>
+                                <div className="mt-2 text-sm text-blue-700">
+                                  <span className="font-medium">Implementation:</span> {rec.implementation}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        
+                        {/* Default recommendations if none from scan */}
+                        {(!scanResults.recommendations || scanResults.recommendations.length === 0) && (
+                          <>
+                            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                              <div className="flex items-start">
+                                <div className="flex-shrink-0 mt-0.5">
+                                  <Lightbulb size={16} className="text-blue-600" />
+                                </div>
+                                <div className="ml-3">
+                                  <h5 className="font-medium text-gray-900">Enable Two-Factor Authentication</h5>
+                                  <p className="text-sm text-gray-700 mt-1">Add an extra layer of security to your account</p>
+                                  <div className="mt-2 text-sm text-blue-700">
+                                    <span className="font-medium">Implementation:</span> Configure in user settings
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                              <div className="flex items-start">
+                                <div className="flex-shrink-0 mt-0.5">
+                                  <Lightbulb size={16} className="text-blue-600" />
+                                </div>
+                                <div className="ml-3">
+                                  <h5 className="font-medium text-gray-900">Use Environment Variables</h5>
+                                  <p className="text-sm text-gray-700 mt-1">Store sensitive data in environment variables instead of hardcoding</p>
+                                  <div className="mt-2 text-sm text-blue-700">
+                                    <span className="font-medium">Implementation:</span> Update workflow configuration
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Scan size={48} className="text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Scan Results</h3>
+                    <p className="text-gray-600 mb-4">Run a security scan to check for vulnerabilities</p>
+                    <button
+                      onClick={runScan}
+                      disabled={isScanning}
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                    >
+                      {isScanning ? 'Scanning...' : 'Start Scan'}
+                    </button>
+                  </div>
+                )}
+              </div>
+              
+              {/* Compliance Status */}
+              {scanResults && (
+                <div className="bg-white border border-gray-200 rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Compliance Status</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {Object.entries(scanResults.compliance || {}).map(([standard, data]: [string, any]) => (
+                      <div key={standard} className="bg-gray-50 rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="font-medium text-gray-900">{standard}</div>
+                          <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            data.compliant ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                          }`}>
+                            {data.compliant ? 'Compliant' : 'Non-Compliant'}
+                          </div>
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          {data.issues} issue{data.issues !== 1 ? 's' : ''} found
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          Last checked: {new Date(data.lastChecked).toLocaleString()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {activeTab === 'access' && (
             <div className="space-y-6">
               {/* API Keys */}
-              <div className="bg-white border border-gray-200 rounded-lg p-6">
+              <div className="bg-white border border-gray-200 rounded-xl p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">API Keys</h3>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
@@ -392,13 +826,25 @@ const SecurityPanel: React.FC<SecurityPanelProps> = ({ isOpen, onClose }) => {
               </div>
 
               {/* User Permissions */}
-              <div className="bg-white border border-gray-200 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">User Permissions</h3>
-                <div className="space-y-3">
+              <div className="bg-white border border-gray-200 rounded-xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">User Permissions</h3>
+                  <button
+                    onClick={() => toggleSectionExpansion('permissions')}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    {expandedSection === 'permissions' ? <Minimize size={16} /> : <Maximize size={16} />}
+                  </button>
+                </div>
+                <div className={`space-y-3 ${
+                  expandedSection === 'permissions' ? 'max-h-96 overflow-y-auto' : ''
+                }`}>
                   {[
                     { user: 'john.doe@company.com', role: 'Admin', lastActive: '2 minutes ago' },
                     { user: 'jane.smith@company.com', role: 'Editor', lastActive: '1 hour ago' },
-                    { user: 'bob.wilson@company.com', role: 'Viewer', lastActive: '1 day ago' }
+                    { user: 'bob.wilson@company.com', role: 'Viewer', lastActive: '1 day ago' },
+                    { user: 'alice.johnson@company.com', role: 'Editor', lastActive: '3 hours ago' },
+                    { user: 'charlie.brown@company.com', role: 'Viewer', lastActive: '2 days ago' }
                   ].map((user, index) => (
                     <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <div>
@@ -419,6 +865,47 @@ const SecurityPanel: React.FC<SecurityPanelProps> = ({ isOpen, onClose }) => {
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+              
+              {/* Security Settings */}
+              <div className="bg-white border border-gray-200 rounded-xl p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Security Settings</h3>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div>
+                      <div className="font-medium text-gray-900">Two-Factor Authentication</div>
+                      <div className="text-sm text-gray-600">Add an extra layer of security to your account</div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" className="sr-only peer" defaultChecked />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+                  
+                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div>
+                      <div className="font-medium text-gray-900">IP Whitelisting</div>
+                      <div className="text-sm text-gray-600">Restrict access to specific IP addresses</div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" className="sr-only peer" />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+                  
+                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div>
+                      <div className="font-medium text-gray-900">Session Timeout</div>
+                      <div className="text-sm text-gray-600">Automatically log out after period of inactivity</div>
+                    </div>
+                    <select className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                      <option value="30">30 minutes</option>
+                      <option value="60">1 hour</option>
+                      <option value="120">2 hours</option>
+                      <option value="240">4 hours</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>
@@ -468,6 +955,31 @@ const SecurityPanel: React.FC<SecurityPanelProps> = ({ isOpen, onClose }) => {
                   </tbody>
                 </table>
               </div>
+              
+              {/* Advanced Audit Features */}
+              <div className="bg-white border border-gray-200 rounded-xl p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Advanced Audit Features</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <div className="flex items-center mb-2">
+                      <FileCheck size={18} className="text-blue-600 mr-2" />
+                      <h4 className="font-medium text-gray-900">Immutable Audit Logs</h4>
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      All audit logs are cryptographically signed and stored in an immutable database to prevent tampering.
+                    </p>
+                  </div>
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <div className="flex items-center mb-2">
+                      <FileLock2 size={18} className="text-purple-600 mr-2" />
+                      <h4 className="font-medium text-gray-900">Compliance Reporting</h4>
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      Generate compliance reports for SOC 2, GDPR, HIPAA, and other regulatory frameworks.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -502,8 +1014,16 @@ const SecurityPanel: React.FC<SecurityPanelProps> = ({ isOpen, onClose }) => {
               </div>
 
               {/* Compliance Details */}
-              <div className="bg-white border border-gray-200 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Compliance Details</h3>
+              <div className="bg-white border border-gray-200 rounded-xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Compliance Details</h3>
+                  <button
+                    onClick={() => toggleSectionExpansion('compliance')}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    {expandedSection === 'compliance' ? <Minimize size={16} /> : <Maximize size={16} />}
+                  </button>
+                </div>
                 <div className="space-y-4">
                   <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                     <h4 className="font-medium text-green-900 mb-2">Data Protection</h4>
@@ -523,6 +1043,57 @@ const SecurityPanel: React.FC<SecurityPanelProps> = ({ isOpen, onClose }) => {
                       <li>• Vulnerability management program</li>
                       <li>• Incident response procedures</li>
                     </ul>
+                  </div>
+                  
+                  {expandedSection === 'compliance' && (
+                    <>
+                      <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                        <h4 className="font-medium text-purple-900 mb-2">Access Management</h4>
+                        <ul className="text-sm text-purple-700 space-y-1">
+                          <li>• Role-based access control (RBAC)</li>
+                          <li>• Multi-factor authentication</li>
+                          <li>• Least privilege principle</li>
+                          <li>• Regular access reviews</li>
+                        </ul>
+                      </div>
+                      
+                      <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <h4 className="font-medium text-yellow-900 mb-2">Business Continuity</h4>
+                        <ul className="text-sm text-yellow-700 space-y-1">
+                          <li>• Disaster recovery planning</li>
+                          <li>• Regular backup testing</li>
+                          <li>• High availability architecture</li>
+                          <li>• Geographic redundancy</li>
+                        </ul>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+              
+              {/* Compliance Certifications */}
+              <div className="bg-white border border-gray-200 rounded-xl p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Certifications & Attestations</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="p-4 bg-gray-50 rounded-lg text-center">
+                    <Shield size={24} className="text-blue-600 mx-auto mb-2" />
+                    <div className="font-medium text-gray-900">SOC 2 Type II</div>
+                    <div className="text-xs text-gray-600 mt-1">Certified</div>
+                  </div>
+                  <div className="p-4 bg-gray-50 rounded-lg text-center">
+                    <Globe size={24} className="text-green-600 mx-auto mb-2" />
+                    <div className="font-medium text-gray-900">GDPR</div>
+                    <div className="text-xs text-gray-600 mt-1">Compliant</div>
+                  </div>
+                  <div className="p-4 bg-gray-50 rounded-lg text-center">
+                    <Shield size={24} className="text-purple-600 mx-auto mb-2" />
+                    <div className="font-medium text-gray-900">ISO 27001</div>
+                    <div className="text-xs text-gray-600 mt-1">Certified</div>
+                  </div>
+                  <div className="p-4 bg-gray-50 rounded-lg text-center">
+                    <Shield size={24} className="text-red-600 mx-auto mb-2" />
+                    <div className="font-medium text-gray-900">HIPAA</div>
+                    <div className="text-xs text-gray-600 mt-1">Ready</div>
                   </div>
                 </div>
               </div>
