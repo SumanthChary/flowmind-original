@@ -6,31 +6,28 @@ import {
   Key, 
   Eye, 
   EyeOff, 
-  CheckCircle, 
-  AlertCircle, 
   Users, 
-  Settings, 
-  Download, 
-  Upload, 
+  AlertTriangle, 
+  CheckCircle, 
+  X, 
   RefreshCw, 
-  X,
-  FileText,
-  Clock,
-  Globe,
-  Database,
-  Wifi,
-  Smartphone,
-  Scan,
+  Download, 
   Search,
+  FileText,
+  User,
+  Clock,
+  Database,
+  Server,
+  Globe,
+  Settings,
+  Filter,
+  AlertCircle,
   Zap,
+  Layers,
+  Activity,
+  BarChart,
   Maximize,
-  Minimize,
-  ArrowRight,
-  HelpCircle,
-  ShieldOff,
-  ShieldCheck,
-  FileCheck,
-  FileLock2
+  Minimize
 } from 'lucide-react';
 import { useWorkflowStore } from '../../store/workflowStore';
 import toast from 'react-hot-toast';
@@ -40,279 +37,33 @@ interface SecurityPanelProps {
   onClose: () => void;
 }
 
-interface SecurityFeature {
-  id: string;
-  name: string;
-  description: string;
-  status: 'active' | 'inactive' | 'warning';
-  icon: React.ReactNode;
-  details: string[];
-}
-
-interface AuditLog {
-  id: string;
-  action: string;
-  user: string;
-  timestamp: string;
-  ip: string;
-  status: 'success' | 'warning' | 'error';
-}
-
-interface Vulnerability {
-  id: string;
-  type: string;
-  severity: 'high' | 'medium' | 'low';
-  description: string;
-  location: string;
-  recommendation: string;
-}
-
 const SecurityPanel: React.FC<SecurityPanelProps> = ({ isOpen, onClose }) => {
   const { currentWorkflow, runSecurityScan } = useWorkflowStore();
-  const [activeTab, setActiveTab] = useState<'overview' | 'access' | 'audit' | 'compliance' | 'scan'>('overview');
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [expandedSection, setExpandedSection] = useState<string | null>(null);
-  const [scanResults, setScanResults] = useState<any>(null);
   const [isScanning, setIsScanning] = useState(false);
-  const [securityScore, setSecurityScore] = useState(85);
+  const [scanResults, setScanResults] = useState<any>(null);
+  const [expandedSection, setExpandedSection] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'overview' | 'vulnerabilities' | 'compliance' | 'settings'>('overview');
 
-  // Load security scan results when panel opens
   useEffect(() => {
-    if (isOpen && currentWorkflow) {
-      const storedResults = localStorage.getItem(`security_scan_${currentWorkflow.id}`);
-      if (storedResults) {
-        try {
-          setScanResults(JSON.parse(storedResults));
-        } catch (error) {
-          console.error('Error parsing stored security scan results:', error);
-        }
-      }
+    if (isOpen && currentWorkflow && !scanResults) {
+      handleScan();
     }
   }, [isOpen, currentWorkflow]);
 
-  const securityFeatures: SecurityFeature[] = [
-    {
-      id: 'encryption',
-      name: 'End-to-End Encryption',
-      description: 'All data encrypted in transit and at rest using AES-256',
-      status: 'active',
-      icon: <Lock size={20} className="text-green-600" />,
-      details: [
-        'AES-256 encryption for data at rest',
-        'TLS 1.3 for data in transit',
-        'Key rotation every 90 days',
-        'Hardware security modules (HSM)'
-      ]
-    },
-    {
-      id: 'soc2',
-      name: 'SOC 2 Type II Certified',
-      description: 'Independently audited security controls and compliance',
-      status: 'active',
-      icon: <Shield size={20} className="text-blue-600" />,
-      details: [
-        'Annual SOC 2 Type II audits',
-        'Security controls monitoring',
-        'Availability and confidentiality',
-        'Processing integrity verification'
-      ]
-    },
-    {
-      id: 'rbac',
-      name: 'Role-Based Access Control',
-      description: 'Granular permissions and user role management',
-      status: 'active',
-      icon: <Users size={20} className="text-purple-600" />,
-      details: [
-        'Custom role definitions',
-        'Principle of least privilege',
-        'Multi-factor authentication',
-        'Session management'
-      ]
-    },
-    {
-      id: 'audit',
-      name: 'Comprehensive Audit Logging',
-      description: 'Complete activity tracking and forensic capabilities',
-      status: 'active',
-      icon: <FileText size={20} className="text-orange-600" />,
-      details: [
-        'Real-time activity logging',
-        'Immutable audit trails',
-        'Automated threat detection',
-        'Compliance reporting'
-      ]
-    },
-    {
-      id: 'backup',
-      name: 'Automated Backups',
-      description: 'Regular encrypted backups with point-in-time recovery',
-      status: 'active',
-      icon: <Database size={20} className="text-teal-600" />,
-      details: [
-        'Hourly automated backups',
-        'Cross-region replication',
-        'Point-in-time recovery',
-        'Encrypted backup storage'
-      ]
-    },
-    {
-      id: 'monitoring',
-      name: '24/7 Security Monitoring',
-      description: 'Continuous threat detection and incident response',
-      status: 'active',
-      icon: <Eye size={20} className="text-red-600" />,
-      details: [
-        'Real-time threat detection',
-        'Automated incident response',
-        'Security operations center',
-        'Vulnerability scanning'
-      ]
-    }
-  ];
-
-  const auditLogs: AuditLog[] = [
-    {
-      id: '1',
-      action: 'User login',
-      user: 'john.doe@company.com',
-      timestamp: '2024-01-15 14:30:25',
-      ip: '192.168.1.100',
-      status: 'success'
-    },
-    {
-      id: '2',
-      action: 'Workflow executed',
-      user: 'system',
-      timestamp: '2024-01-15 14:28:15',
-      ip: '10.0.0.1',
-      status: 'success'
-    },
-    {
-      id: '3',
-      action: 'API key generated',
-      user: 'admin@company.com',
-      timestamp: '2024-01-15 14:25:10',
-      ip: '192.168.1.101',
-      status: 'success'
-    },
-    {
-      id: '4',
-      action: 'Failed login attempt',
-      user: 'unknown@example.com',
-      timestamp: '2024-01-15 14:20:05',
-      ip: '203.0.113.1',
-      status: 'warning'
-    },
-    {
-      id: '5',
-      action: 'Permission denied',
-      user: 'guest@company.com',
-      timestamp: '2024-01-15 14:15:30',
-      ip: '192.168.1.102',
-      status: 'error'
-    }
-  ];
-
-  const complianceStandards = [
-    {
-      name: 'SOC 2 Type II',
-      status: 'Certified',
-      validUntil: '2024-12-31',
-      icon: <Shield size={16} className="text-green-600" />
-    },
-    {
-      name: 'GDPR',
-      status: 'Compliant',
-      validUntil: 'Ongoing',
-      icon: <Globe size={16} className="text-blue-600" />
-    },
-    {
-      name: 'ISO 27001',
-      status: 'Certified',
-      validUntil: '2024-08-15',
-      icon: <Lock size={16} className="text-purple-600" />
-    },
-    {
-      name: 'HIPAA',
-      status: 'Ready',
-      validUntil: 'On Request',
-      icon: <FileText size={16} className="text-teal-600" />
-    }
-  ];
-
-  const vulnerabilities: Vulnerability[] = scanResults?.vulnerabilities || [
-    {
-      id: 'vuln-1',
-      type: 'sensitive_data_exposure',
-      severity: 'high',
-      description: 'API key found in workflow configuration',
-      location: 'Node: "API Call" (id: action-123)',
-      recommendation: 'Use environment variables for sensitive data'
-    },
-    {
-      id: 'vuln-2',
-      type: 'insecure_connection',
-      severity: 'medium',
-      description: 'Insecure HTTP connection detected',
-      location: 'Node: "Webhook" (id: webhook-456)',
-      recommendation: 'Use HTTPS for all external connections'
-    },
-    {
-      id: 'vuln-3',
-      type: 'missing_validation',
-      severity: 'low',
-      description: 'Input data not validated before processing',
-      location: 'Node: "Process Data" (id: data-789)',
-      recommendation: 'Add input validation to prevent injection attacks'
-    }
-  ];
-
-  const generateApiKey = () => {
-    const newKey = 'sk_live_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-    toast.success('New API key generated successfully!');
-    return newKey;
-  };
-
-  const downloadAuditLog = () => {
-    const auditData = {
-      exported_at: new Date().toISOString(),
-      logs: auditLogs,
-      total_entries: auditLogs.length
-    };
-
-    const dataStr = JSON.stringify(auditData, null, 2);
-    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+  const handleScan = async () => {
+    if (!currentWorkflow) return;
     
-    const exportFileDefaultName = `audit-log-${Date.now()}.json`;
-    const linkElement = document.createElement('a');
-    linkElement.setAttribute('href', dataUri);
-    linkElement.setAttribute('download', exportFileDefaultName);
-    linkElement.click();
-    
-    toast.success('Audit log exported successfully!');
-  };
-
-  const runScan = async () => {
-    if (!currentWorkflow) {
-      toast.error('No workflow selected');
-      return;
-    }
-
     setIsScanning(true);
-    setActiveTab('scan');
-
+    
     try {
-      // Run security scan using the enhanced security service
       const results = await runSecurityScan(currentWorkflow.id);
-      
       setScanResults(results);
-      setSecurityScore(results.securityScore || 85);
       
-      // Store results
-      localStorage.setItem(`security_scan_${currentWorkflow.id}`, JSON.stringify(results));
-      
-      toast.success(`Security scan completed with score: ${results.securityScore}/100`);
+      if (results.vulnerabilities.length > 0) {
+        toast.warning(`Security scan found ${results.vulnerabilities.length} potential issues`);
+      } else {
+        toast.success('Security scan completed. No vulnerabilities found!');
+      }
     } catch (error) {
       toast.error('Security scan failed');
       console.error('Security scan error:', error);
@@ -321,29 +72,27 @@ const SecurityPanel: React.FC<SecurityPanelProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'success':
-        return <CheckCircle size={16} className="text-green-600" />;
-      case 'warning':
-        return <AlertCircle size={16} className="text-yellow-600" />;
-      case 'error':
-        return <AlertCircle size={16} className="text-red-600" />;
-      default:
-        return <CheckCircle size={16} className="text-gray-400" />;
-    }
+  const getSecurityScoreColor = (score: number) => {
+    if (score >= 90) return 'text-green-600';
+    if (score >= 70) return 'text-yellow-600';
+    return 'text-red-600';
   };
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
-      case 'high':
-        return 'text-red-600 bg-red-50 border-red-200';
-      case 'medium':
-        return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-      case 'low':
-        return 'text-blue-600 bg-blue-50 border-blue-200';
-      default:
-        return 'text-gray-600 bg-gray-50 border-gray-200';
+      case 'high': return 'bg-red-100 text-red-800';
+      case 'medium': return 'bg-yellow-100 text-yellow-800';
+      case 'low': return 'bg-blue-100 text-blue-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getComplianceStatusColor = (status: string) => {
+    switch (status) {
+      case 'compliant': return 'text-green-600';
+      case 'non-compliant': return 'text-red-600';
+      case 'partial': return 'text-yellow-600';
+      default: return 'text-gray-600';
     }
   };
 
@@ -353,6 +102,32 @@ const SecurityPanel: React.FC<SecurityPanelProps> = ({ isOpen, onClose }) => {
     } else {
       setExpandedSection(section);
     }
+  };
+
+  const downloadReport = () => {
+    if (!scanResults) return;
+    
+    const reportData = {
+      workflowId: currentWorkflow?.id,
+      workflowName: currentWorkflow?.name,
+      scanDate: new Date().toISOString(),
+      securityScore: scanResults.securityScore,
+      vulnerabilities: scanResults.vulnerabilities,
+      recommendations: scanResults.recommendations,
+      compliance: scanResults.compliance
+    };
+    
+    const dataStr = JSON.stringify(reportData, null, 2);
+    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+    
+    const downloadLink = document.createElement('a');
+    downloadLink.setAttribute('href', dataUri);
+    downloadLink.setAttribute('download', `security-report-${currentWorkflow?.id}.json`);
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+    
+    toast.success('Security report downloaded');
   };
 
   if (!isOpen) return null;
@@ -377,32 +152,37 @@ const SecurityPanel: React.FC<SecurityPanelProps> = ({ isOpen, onClose }) => {
               <Shield size={20} className="text-white" />
             </div>
             <div className="text-white">
-              <h2 className="text-xl font-bold">Enterprise Security</h2>
-              <p className="text-sm text-red-100">SOC 2 certified with enterprise-grade protection</p>
+              <h2 className="text-xl font-bold">Security & Compliance</h2>
+              <p className="text-sm text-red-100">Enterprise-grade security monitoring and protection</p>
             </div>
           </div>
           <div className="flex items-center space-x-2">
             <button
-              onClick={runScan}
+              onClick={handleScan}
               disabled={isScanning}
-              className="flex items-center px-4 py-2 bg-white text-red-600 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+              className="flex items-center px-4 py-2 bg-white bg-opacity-20 text-white rounded-lg hover:bg-opacity-30 transition-colors disabled:opacity-50"
             >
               {isScanning ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600 mr-2"></div>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                   Scanning...
                 </>
               ) : (
                 <>
-                  <Scan size={16} className="mr-2" />
-                  Scan Workflow
+                  <RefreshCw size={16} className="mr-2" />
+                  Scan Now
                 </>
               )}
             </button>
-            <div className="flex items-center space-x-1 text-white text-sm">
-              <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-              <span>All systems secure</span>
-            </div>
+            {scanResults && (
+              <button
+                onClick={downloadReport}
+                className="flex items-center px-4 py-2 bg-white bg-opacity-20 text-white rounded-lg hover:bg-opacity-30 transition-colors"
+              >
+                <Download size={16} className="mr-2" />
+                Export
+              </button>
+            )}
             <button
               onClick={onClose}
               className="text-white hover:bg-white hover:bg-opacity-20 p-2 rounded-lg transition-colors"
@@ -415,11 +195,10 @@ const SecurityPanel: React.FC<SecurityPanelProps> = ({ isOpen, onClose }) => {
         {/* Tabs */}
         <div className="flex border-b border-gray-200">
           {[
-            { id: 'overview', label: 'Security Overview', icon: <Shield size={16} /> },
-            { id: 'scan', label: 'Vulnerability Scan', icon: <Scan size={16} /> },
-            { id: 'access', label: 'Access Control', icon: <Key size={16} /> },
-            { id: 'audit', label: 'Audit Logs', icon: <FileText size={16} /> },
-            { id: 'compliance', label: 'Compliance', icon: <CheckCircle size={16} /> }
+            { id: 'overview', label: 'Overview', icon: <Shield size={16} /> },
+            { id: 'vulnerabilities', label: 'Vulnerabilities', icon: <AlertTriangle size={16} /> },
+            { id: 'compliance', label: 'Compliance', icon: <CheckCircle size={16} /> },
+            { id: 'settings', label: 'Settings', icon: <Settings size={16} /> }
           ].map((tab) => (
             <button
               key={tab.id}
@@ -438,666 +217,616 @@ const SecurityPanel: React.FC<SecurityPanelProps> = ({ isOpen, onClose }) => {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
-          {activeTab === 'overview' && (
-            <div className="space-y-6">
-              {/* Security Status */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-                  <CheckCircle size={32} className="text-green-600 mx-auto mb-2" />
-                  <div className="text-lg font-bold text-green-900">Secure</div>
-                  <div className="text-sm text-green-700">All systems protected</div>
-                </div>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-                  <Shield size={32} className="text-blue-600 mx-auto mb-2" />
-                  <div className="text-lg font-bold text-blue-900">SOC 2 Certified</div>
-                  <div className="text-sm text-blue-700">Independently audited</div>
-                </div>
-                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 text-center">
-                  <Lock size={32} className="text-purple-600 mx-auto mb-2" />
-                  <div className="text-lg font-bold text-purple-900">Encrypted</div>
-                  <div className="text-sm text-purple-700">End-to-end protection</div>
-                </div>
-              </div>
-
-              {/* Security Score */}
-              <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Security Score</h3>
-                  <button
-                    onClick={() => toggleSectionExpansion('securityScore')}
-                    className="text-gray-500 hover:text-gray-700"
-                  >
-                    {expandedSection === 'securityScore' ? <Minimize size={18} /> : <Maximize size={18} />}
-                  </button>
-                </div>
-                
-                <div className="flex items-center justify-center mb-4">
-                  <div className="relative w-40 h-40">
-                    <svg className="w-full h-full" viewBox="0 0 100 100">
-                      <circle 
-                        cx="50" 
-                        cy="50" 
-                        r="45" 
-                        fill="none" 
-                        stroke="#e5e7eb" 
-                        strokeWidth="10" 
-                      />
-                      <circle 
-                        cx="50" 
-                        cy="50" 
-                        r="45" 
-                        fill="none" 
-                        stroke={securityScore > 80 ? "#10b981" : securityScore > 60 ? "#f59e0b" : "#ef4444"} 
-                        strokeWidth="10" 
-                        strokeDasharray="283"
-                        strokeDashoffset={283 - (283 * securityScore / 100)}
-                        transform="rotate(-90 50 50)"
-                      />
-                    </svg>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="text-center">
-                        <div className="text-3xl font-bold text-gray-900">{securityScore}</div>
-                        <div className="text-sm text-gray-600">/100</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className={`grid grid-cols-1 md:grid-cols-3 gap-4 ${
-                  expandedSection === 'securityScore' ? '' : 'hidden md:grid'
-                }`}>
-                  <div className="bg-gray-50 rounded-lg p-3 text-center">
-                    <div className="text-sm font-medium text-gray-700">Encryption</div>
-                    <div className="text-lg font-semibold text-green-600">100%</div>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-3 text-center">
-                    <div className="text-sm font-medium text-gray-700">Access Control</div>
-                    <div className="text-lg font-semibold text-green-600">95%</div>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-3 text-center">
-                    <div className="text-sm font-medium text-gray-700">Vulnerability</div>
-                    <div className="text-lg font-semibold text-yellow-600">78%</div>
-                  </div>
-                </div>
-                
-                {expandedSection === 'securityScore' && (
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <h4 className="font-medium text-gray-900 mb-2">Recommendations</h4>
-                    <ul className="space-y-2">
-                      <li className="flex items-start">
-                        <ArrowRight size={16} className="text-blue-600 mt-0.5 mr-2 flex-shrink-0" />
-                        <span className="text-sm text-gray-700">Enable two-factor authentication for all users</span>
-                      </li>
-                      <li className="flex items-start">
-                        <ArrowRight size={16} className="text-blue-600 mt-0.5 mr-2 flex-shrink-0" />
-                        <span className="text-sm text-gray-700">Use environment variables for API keys and credentials</span>
-                      </li>
-                      <li className="flex items-start">
-                        <ArrowRight size={16} className="text-blue-600 mt-0.5 mr-2 flex-shrink-0" />
-                        <span className="text-sm text-gray-700">Implement input validation for all workflow triggers</span>
-                      </li>
-                    </ul>
-                  </div>
-                )}
-              </div>
-
-              {/* Security Features */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {securityFeatures.map((feature) => (
-                  <div key={feature.id} className="bg-white border border-gray-200 rounded-lg p-6">
-                    <div className="flex items-start space-x-4">
-                      <div className="flex-shrink-0">
-                        {feature.icon}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-2">
-                          <h3 className="font-semibold text-gray-900">{feature.name}</h3>
-                          <div className={`w-3 h-3 rounded-full ${
-                            feature.status === 'active' ? 'bg-green-500' :
-                            feature.status === 'warning' ? 'bg-yellow-500' :
-                            'bg-red-500'
-                          }`}></div>
-                        </div>
-                        <p className="text-gray-600 text-sm mb-3">{feature.description}</p>
-                        <ul className="space-y-1">
-                          {feature.details.map((detail, index) => (
-                            <li key={index} className="text-xs text-gray-500 flex items-center">
-                              <CheckCircle size={12} className="text-green-500 mr-2" />
-                              {detail}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+          {isScanning ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="flex flex-col items-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mb-4"></div>
+                <p className="text-gray-600">Scanning workflow for security vulnerabilities...</p>
               </div>
             </div>
-          )}
-
-          {activeTab === 'scan' && (
-            <div className="space-y-6">
-              {/* Scan Controls */}
-              <div className="bg-white border border-gray-200 rounded-xl p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Vulnerability Scanner</h3>
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={runScan}
-                      disabled={isScanning}
-                      className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
-                    >
-                      {isScanning ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          Scanning...
-                        </>
-                      ) : (
-                        <>
-                          <Scan size={16} className="mr-2" />
-                          Start Scan
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-                
-                {scanResults ? (
-                  <div>
+          ) : !scanResults ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="flex flex-col items-center">
+                <Shield size={48} className="text-gray-300 mb-4" />
+                <p className="text-gray-600">No security scan results available</p>
+                <button
+                  onClick={handleScan}
+                  className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  Run Security Scan
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {activeTab === 'overview' && (
+                <div className="space-y-6">
+                  {/* Security Score */}
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                     <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <div className="text-sm text-gray-600">Last scan: {new Date(scanResults.timestamp || Date.now()).toLocaleString()}</div>
-                        <div className="text-sm text-gray-600">Scan duration: {scanResults.duration || 1250}ms</div>
+                      <h3 className="text-lg font-semibold text-gray-900">Security Score</h3>
+                      <button
+                        onClick={() => toggleSectionExpansion('score')}
+                        className="text-gray-500 hover:text-gray-700"
+                      >
+                        {expandedSection === 'score' ? <Minimize size={18} /> : <Maximize size={18} />}
+                      </button>
+                    </div>
+                    <div className="flex flex-col md:flex-row items-center justify-between">
+                      <div className="flex items-center mb-4 md:mb-0">
+                        <div className={`text-6xl font-bold ${getSecurityScoreColor(scanResults.securityScore)}`}>
+                          {scanResults.securityScore}
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm text-gray-600">out of 100</div>
+                          <div className={`font-medium ${getSecurityScoreColor(scanResults.securityScore)}`}>
+                            {scanResults.securityScore >= 90 ? 'Excellent' : 
+                             scanResults.securityScore >= 70 ? 'Good' : 
+                             scanResults.securityScore >= 50 ? 'Fair' : 'Poor'}
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="text-sm font-medium text-gray-700">Security Score:</div>
-                        <div className={`px-2 py-1 rounded-full text-sm font-medium ${
-                          securityScore >= 90 ? 'bg-green-100 text-green-800' :
-                          securityScore >= 70 ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {securityScore}/100
+                      <div className="w-full md:w-1/2">
+                        <div className="w-full bg-gray-200 rounded-full h-4">
+                          <div 
+                            className={`h-4 rounded-full ${
+                              scanResults.securityScore >= 90 ? 'bg-green-500' : 
+                              scanResults.securityScore >= 70 ? 'bg-yellow-500' : 
+                              'bg-red-500'
+                            }`}
+                            style={{ width: `${scanResults.securityScore}%` }}
+                          ></div>
+                        </div>
+                        <div className="flex justify-between text-xs text-gray-600 mt-1">
+                          <span>0</span>
+                          <span>50</span>
+                          <span>100</span>
                         </div>
                       </div>
                     </div>
                     
-                    <div className="mb-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-medium text-gray-900">Vulnerabilities Found: {vulnerabilities.length}</h4>
-                        <button
-                          onClick={() => toggleSectionExpansion('vulnerabilities')}
-                          className="text-gray-500 hover:text-gray-700"
-                        >
-                          {expandedSection === 'vulnerabilities' ? <Minimize size={16} /> : <Maximize size={16} />}
-                        </button>
-                      </div>
-                      
-                      {vulnerabilities.length > 0 ? (
-                        <div className={`space-y-3 ${
-                          expandedSection === 'vulnerabilities' ? 'max-h-96 overflow-y-auto' : 'max-h-60 overflow-y-auto'
-                        }`}>
-                          {vulnerabilities.map((vuln) => (
-                            <div 
-                              key={vuln.id} 
-                              className={`p-4 border rounded-lg ${getSeverityColor(vuln.severity)}`}
-                            >
-                              <div className="flex items-start">
-                                <div className="flex-shrink-0 mt-0.5">
-                                  {vuln.severity === 'high' ? (
-                                    <AlertCircle size={16} className="text-red-600" />
-                                  ) : vuln.severity === 'medium' ? (
-                                    <AlertCircle size={16} className="text-yellow-600" />
-                                  ) : (
-                                    <HelpCircle size={16} className="text-blue-600" />
-                                  )}
-                                </div>
-                                <div className="ml-3 flex-1">
-                                  <div className="flex items-center justify-between">
-                                    <h5 className="font-medium text-gray-900">{vuln.type.replace(/_/g, ' ')}</h5>
-                                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${
-                                      vuln.severity === 'high' ? 'bg-red-100 text-red-800' :
-                                      vuln.severity === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                                      'bg-blue-100 text-blue-800'
-                                    }`}>
-                                      {vuln.severity}
-                                    </span>
-                                  </div>
-                                  <p className="text-sm text-gray-700 mt-1">{vuln.description}</p>
-                                  <div className="text-xs text-gray-500 mt-1">Location: {vuln.location}</div>
-                                  <div className="mt-2 text-sm text-gray-700">
-                                    <span className="font-medium">Recommendation:</span> {vuln.recommendation}
-                                  </div>
-                                </div>
-                              </div>
+                    {expandedSection === 'score' && (
+                      <div className="mt-6 pt-6 border-t border-gray-200">
+                        <h4 className="font-medium text-gray-900 mb-3">Score Breakdown</h4>
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center">
+                              <Lock size={16} className="text-gray-600 mr-2" />
+                              <span className="text-sm">Access Control</span>
                             </div>
-                          ))}
+                            <div className="flex items-center">
+                              <div className="w-32 bg-gray-200 rounded-full h-2 mr-3">
+                                <div 
+                                  className="h-2 rounded-full bg-green-500"
+                                  style={{ width: '90%' }}
+                                ></div>
+                              </div>
+                              <span className="text-sm font-medium">90%</span>
+                            </div>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center">
+                              <Database size={16} className="text-gray-600 mr-2" />
+                              <span className="text-sm">Data Protection</span>
+                            </div>
+                            <div className="flex items-center">
+                              <div className="w-32 bg-gray-200 rounded-full h-2 mr-3">
+                                <div 
+                                  className="h-2 rounded-full bg-green-500"
+                                  style={{ width: '85%' }}
+                                ></div>
+                              </div>
+                              <span className="text-sm font-medium">85%</span>
+                            </div>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center">
+                              <Globe size={16} className="text-gray-600 mr-2" />
+                              <span className="text-sm">Network Security</span>
+                            </div>
+                            <div className="flex items-center">
+                              <div className="w-32 bg-gray-200 rounded-full h-2 mr-3">
+                                <div 
+                                  className="h-2 rounded-full bg-yellow-500"
+                                  style={{ width: '70%' }}
+                                ></div>
+                              </div>
+                              <span className="text-sm font-medium">70%</span>
+                            </div>
+                          </div>
                         </div>
-                      ) : (
-                        <div className="text-center py-6 bg-gray-50 rounded-lg">
-                          <ShieldCheck size={32} className="text-green-500 mx-auto mb-2" />
-                          <p className="text-gray-700">No vulnerabilities found!</p>
-                          <p className="text-sm text-gray-500 mt-1">Your workflow is secure</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Summary */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                      <div className="flex items-center mb-4">
+                        <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center mr-3">
+                          <AlertTriangle size={20} className="text-red-600" />
                         </div>
-                      )}
+                        <div>
+                          <div className="text-sm text-gray-600">Vulnerabilities</div>
+                          <div className="text-2xl font-bold text-gray-900">{scanResults.vulnerabilities.length}</div>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-gray-600">High</span>
+                          <span className="text-xs font-medium text-red-600">
+                            {scanResults.vulnerabilities.filter((v: any) => v.severity === 'high').length}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-gray-600">Medium</span>
+                          <span className="text-xs font-medium text-yellow-600">
+                            {scanResults.vulnerabilities.filter((v: any) => v.severity === 'medium').length}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-gray-600">Low</span>
+                          <span className="text-xs font-medium text-blue-600">
+                            {scanResults.vulnerabilities.filter((v: any) => v.severity === 'low').length}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-medium text-gray-900">Recommendations</h4>
-                        <button
-                          onClick={() => toggleSectionExpansion('recommendations')}
-                          className="text-gray-500 hover:text-gray-700"
-                        >
-                          {expandedSection === 'recommendations' ? <Minimize size={16} /> : <Maximize size={16} />}
-                        </button>
+
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                      <div className="flex items-center mb-4">
+                        <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mr-3">
+                          <CheckCircle size={20} className="text-green-600" />
+                        </div>
+                        <div>
+                          <div className="text-sm text-gray-600">Compliance</div>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {Object.values(scanResults.compliance).filter((c: any) => c.compliant).length}/
+                            {Object.keys(scanResults.compliance).length}
+                          </div>
+                        </div>
                       </div>
-                      
-                      <div className={`space-y-3 ${
-                        expandedSection === 'recommendations' ? 'max-h-96 overflow-y-auto' : ''
-                      }`}>
-                        {(scanResults.recommendations || []).map((rec: any, index: number) => (
-                          <div key={index} className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                            <div className="flex items-start">
-                              <div className="flex-shrink-0 mt-0.5">
-                                <Lightbulb size={16} className="text-blue-600" />
-                              </div>
-                              <div className="ml-3">
-                                <h5 className="font-medium text-gray-900">{rec.title}</h5>
-                                <p className="text-sm text-gray-700 mt-1">{rec.description}</p>
-                                <div className="mt-2 text-sm text-blue-700">
-                                  <span className="font-medium">Implementation:</span> {rec.implementation}
-                                </div>
-                              </div>
-                            </div>
+                      <div className="space-y-2">
+                        {Object.entries(scanResults.compliance).map(([standard, data]: [string, any]) => (
+                          <div key={standard} className="flex justify-between items-center">
+                            <span className="text-xs text-gray-600">{standard}</span>
+                            <span className={`text-xs font-medium ${
+                              data.compliant ? 'text-green-600' : 'text-red-600'
+                            }`}>
+                              {data.compliant ? 'Compliant' : 'Non-compliant'}
+                            </span>
                           </div>
                         ))}
-                        
-                        {/* Default recommendations if none from scan */}
-                        {(!scanResults.recommendations || scanResults.recommendations.length === 0) && (
-                          <>
-                            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                              <div className="flex items-start">
-                                <div className="flex-shrink-0 mt-0.5">
-                                  <Lightbulb size={16} className="text-blue-600" />
-                                </div>
-                                <div className="ml-3">
-                                  <h5 className="font-medium text-gray-900">Enable Two-Factor Authentication</h5>
-                                  <p className="text-sm text-gray-700 mt-1">Add an extra layer of security to your account</p>
-                                  <div className="mt-2 text-sm text-blue-700">
-                                    <span className="font-medium">Implementation:</span> Configure in user settings
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                              <div className="flex items-start">
-                                <div className="flex-shrink-0 mt-0.5">
-                                  <Lightbulb size={16} className="text-blue-600" />
-                                </div>
-                                <div className="ml-3">
-                                  <h5 className="font-medium text-gray-900">Use Environment Variables</h5>
-                                  <p className="text-sm text-gray-700 mt-1">Store sensitive data in environment variables instead of hardcoding</p>
-                                  <div className="mt-2 text-sm text-blue-700">
-                                    <span className="font-medium">Implementation:</span> Update workflow configuration
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </>
-                        )}
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                      <div className="flex items-center mb-4">
+                        <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                          <Zap size={20} className="text-blue-600" />
+                        </div>
+                        <div>
+                          <div className="text-sm text-gray-600">Recommendations</div>
+                          <div className="text-2xl font-bold text-gray-900">{scanResults.recommendations.length}</div>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        {scanResults.recommendations.slice(0, 3).map((rec: any, index: number) => (
+                          <div key={index} className="flex justify-between items-center">
+                            <span className="text-xs text-gray-600 truncate">{rec.title}</span>
+                            <span className={`text-xs font-medium ${
+                              rec.priority === 'high' ? 'text-red-600' : 
+                              rec.priority === 'medium' ? 'text-yellow-600' : 
+                              'text-blue-600'
+                            }`}>
+                              {rec.priority}
+                            </span>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <Scan size={48} className="text-gray-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Scan Results</h3>
-                    <p className="text-gray-600 mb-4">Run a security scan to check for vulnerabilities</p>
-                    <button
-                      onClick={runScan}
-                      disabled={isScanning}
-                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
-                    >
-                      {isScanning ? 'Scanning...' : 'Start Scan'}
-                    </button>
-                  </div>
-                )}
-              </div>
-              
-              {/* Compliance Status */}
-              {scanResults && (
-                <div className="bg-white border border-gray-200 rounded-xl p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Compliance Status</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {Object.entries(scanResults.compliance || {}).map(([standard, data]: [string, any]) => (
-                      <div key={standard} className="bg-gray-50 rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="font-medium text-gray-900">{standard}</div>
-                          <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            data.compliant ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                          }`}>
-                            {data.compliant ? 'Compliant' : 'Non-Compliant'}
+
+                  {/* Recommendations */}
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-lg font-semibold text-gray-900">Security Recommendations</h3>
+                      <button
+                        onClick={() => toggleSectionExpansion('recommendations')}
+                        className="text-gray-500 hover:text-gray-700"
+                      >
+                        {expandedSection === 'recommendations' ? <Minimize size={18} /> : <Maximize size={18} />}
+                      </button>
+                    </div>
+                    <div className="space-y-4">
+                      {scanResults.recommendations.slice(0, expandedSection === 'recommendations' ? undefined : 3).map((rec: any, index: number) => (
+                        <div key={index} className="bg-gray-50 rounded-lg p-4">
+                          <div className="flex items-start">
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center mr-3 ${
+                              rec.priority === 'high' ? 'bg-red-100 text-red-600' : 
+                              rec.priority === 'medium' ? 'bg-yellow-100 text-yellow-600' : 
+                              'bg-blue-100 text-blue-600'
+                            }`}>
+                              {rec.priority === 'high' ? <AlertTriangle size={16} /> : 
+                               rec.priority === 'medium' ? <AlertCircle size={16} /> : 
+                               <Zap size={16} />}
+                            </div>
+                            <div>
+                              <h4 className="font-medium text-gray-900">{rec.title}</h4>
+                              <p className="text-sm text-gray-600 mt-1">{rec.description}</p>
+                              <div className="mt-2 text-sm">
+                                <span className="font-medium text-gray-700">Implementation: </span>
+                                <span className="text-gray-600">{rec.implementation}</span>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                        <div className="text-sm text-gray-600">
-                          {data.issues} issue{data.issues !== 1 ? 's' : ''} found
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          Last checked: {new Date(data.lastChecked).toLocaleString()}
-                        </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
+                    {scanResults.recommendations.length > 3 && expandedSection !== 'recommendations' && (
+                      <button
+                        onClick={() => setExpandedSection('recommendations')}
+                        className="mt-4 text-sm text-red-600 hover:text-red-700 font-medium flex items-center"
+                      >
+                        View all {scanResults.recommendations.length} recommendations
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
-            </div>
-          )}
 
-          {activeTab === 'access' && (
-            <div className="space-y-6">
-              {/* API Keys */}
-              <div className="bg-white border border-gray-200 rounded-xl p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">API Keys</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div>
-                      <div className="font-medium text-gray-900">Production API Key</div>
-                      <div className="text-sm text-gray-600">
-                        {showApiKey ? 'sk_live_1234567890abcdef' : '••••••••••••••••••••'}
-                      </div>
+              {activeTab === 'vulnerabilities' && (
+                <div className="space-y-6">
+                  {/* Search and Filter */}
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                    <div className="relative">
+                      <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search vulnerabilities..."
+                        className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent w-full sm:w-64"
+                      />
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => setShowApiKey(!showApiKey)}
-                        className="p-2 text-gray-600 hover:text-gray-900"
-                      >
-                        {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                      <button
-                        onClick={generateApiKey}
-                        className="flex items-center px-3 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
-                      >
-                        <RefreshCw size={14} className="mr-1" />
-                        Regenerate
-                      </button>
+                    <div className="flex items-center space-x-3">
+                      <select className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent">
+                        <option value="all">All Severities</option>
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                      </select>
+                      <select className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent">
+                        <option value="all">All Types</option>
+                        <option value="sensitive_data">Sensitive Data</option>
+                        <option value="access_control">Access Control</option>
+                        <option value="insecure_connections">Insecure Connections</option>
+                      </select>
                     </div>
                   </div>
-                </div>
-              </div>
 
-              {/* User Permissions */}
-              <div className="bg-white border border-gray-200 rounded-xl p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">User Permissions</h3>
-                  <button
-                    onClick={() => toggleSectionExpansion('permissions')}
-                    className="text-gray-500 hover:text-gray-700"
-                  >
-                    {expandedSection === 'permissions' ? <Minimize size={16} /> : <Maximize size={16} />}
-                  </button>
-                </div>
-                <div className={`space-y-3 ${
-                  expandedSection === 'permissions' ? 'max-h-96 overflow-y-auto' : ''
-                }`}>
-                  {[
-                    { user: 'john.doe@company.com', role: 'Admin', lastActive: '2 minutes ago' },
-                    { user: 'jane.smith@company.com', role: 'Editor', lastActive: '1 hour ago' },
-                    { user: 'bob.wilson@company.com', role: 'Viewer', lastActive: '1 day ago' },
-                    { user: 'alice.johnson@company.com', role: 'Editor', lastActive: '3 hours ago' },
-                    { user: 'charlie.brown@company.com', role: 'Viewer', lastActive: '2 days ago' }
-                  ].map((user, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div>
-                        <div className="font-medium text-gray-900">{user.user}</div>
-                        <div className="text-sm text-gray-600">Last active: {user.lastActive}</div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span className={`px-2 py-1 text-xs rounded-full ${
-                          user.role === 'Admin' ? 'bg-red-100 text-red-700' :
-                          user.role === 'Editor' ? 'bg-blue-100 text-blue-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                          {user.role}
-                        </span>
-                        <button className="p-1 text-gray-600 hover:text-gray-900">
-                          <Settings size={14} />
-                        </button>
-                      </div>
+                  {/* Vulnerabilities List */}
+                  {scanResults.vulnerabilities.length === 0 ? (
+                    <div className="bg-green-50 rounded-xl p-8 text-center">
+                      <CheckCircle size={48} className="text-green-500 mx-auto mb-4" />
+                      <h3 className="text-xl font-semibold text-green-800 mb-2">No Vulnerabilities Found</h3>
+                      <p className="text-green-700">
+                        Great job! Your workflow passed all security checks.
+                      </p>
                     </div>
-                  ))}
-                </div>
-              </div>
-              
-              {/* Security Settings */}
-              <div className="bg-white border border-gray-200 rounded-xl p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Security Settings</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div>
-                      <div className="font-medium text-gray-900">Two-Factor Authentication</div>
-                      <div className="text-sm text-gray-600">Add an extra layer of security to your account</div>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" className="sr-only peer" defaultChecked />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                    </label>
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div>
-                      <div className="font-medium text-gray-900">IP Whitelisting</div>
-                      <div className="text-sm text-gray-600">Restrict access to specific IP addresses</div>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" className="sr-only peer" />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                    </label>
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div>
-                      <div className="font-medium text-gray-900">Session Timeout</div>
-                      <div className="text-sm text-gray-600">Automatically log out after period of inactivity</div>
-                    </div>
-                    <select className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                      <option value="30">30 minutes</option>
-                      <option value="60">1 hour</option>
-                      <option value="120">2 hours</option>
-                      <option value="240">4 hours</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'audit' && (
-            <div className="space-y-6">
-              {/* Audit Controls */}
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Audit Trail</h3>
-                <button
-                  onClick={downloadAuditLog}
-                  className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  <Download size={16} className="mr-2" />
-                  Export Logs
-                </button>
-              </div>
-
-              {/* Audit Logs Table */}
-              <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Timestamp</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">IP Address</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {auditLogs.map((log) => (
-                      <tr key={log.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{log.action}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{log.user}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{log.timestamp}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{log.ip}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            {getStatusIcon(log.status)}
-                            <span className="ml-2 text-sm capitalize">{log.status}</span>
+                  ) : (
+                    <div className="space-y-4">
+                      {scanResults.vulnerabilities.map((vuln: any, index: number) => (
+                        <div key={index} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex items-start">
+                              <div className={`w-10 h-10 rounded-lg flex items-center justify-center mr-3 ${
+                                vuln.severity === 'high' ? 'bg-red-100 text-red-600' : 
+                                vuln.severity === 'medium' ? 'bg-yellow-100 text-yellow-600' : 
+                                'bg-blue-100 text-blue-600'
+                              }`}>
+                                <AlertTriangle size={20} />
+                              </div>
+                              <div>
+                                <h4 className="text-lg font-semibold text-gray-900">{vuln.type.replace(/_/g, ' ')}</h4>
+                                <div className="flex items-center mt-1">
+                                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getSeverityColor(vuln.severity)}`}>
+                                    {vuln.severity}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => toggleSectionExpansion(`vuln-${index}`)}
+                              className="text-gray-500 hover:text-gray-700"
+                            >
+                              {expandedSection === `vuln-${index}` ? <Minimize size={18} /> : <Maximize size={18} />}
+                            </button>
                           </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              
-              {/* Advanced Audit Features */}
-              <div className="bg-white border border-gray-200 rounded-xl p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Advanced Audit Features</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="p-4 bg-gray-50 rounded-lg">
-                    <div className="flex items-center mb-2">
-                      <FileCheck size={18} className="text-blue-600 mr-2" />
-                      <h4 className="font-medium text-gray-900">Immutable Audit Logs</h4>
-                    </div>
-                    <p className="text-sm text-gray-600">
-                      All audit logs are cryptographically signed and stored in an immutable database to prevent tampering.
-                    </p>
-                  </div>
-                  <div className="p-4 bg-gray-50 rounded-lg">
-                    <div className="flex items-center mb-2">
-                      <FileLock2 size={18} className="text-purple-600 mr-2" />
-                      <h4 className="font-medium text-gray-900">Compliance Reporting</h4>
-                    </div>
-                    <p className="text-sm text-gray-600">
-                      Generate compliance reports for SOC 2, GDPR, HIPAA, and other regulatory frameworks.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'compliance' && (
-            <div className="space-y-6">
-              {/* Compliance Standards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {complianceStandards.map((standard, index) => (
-                  <div key={index} className="bg-white border border-gray-200 rounded-lg p-6">
-                    <div className="flex items-start space-x-4">
-                      <div className="flex-shrink-0">
-                        {standard.icon}
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-gray-900 mb-1">{standard.name}</h3>
-                        <div className="flex items-center space-x-2 mb-2">
-                          <span className={`px-2 py-1 text-xs rounded-full ${
-                            standard.status === 'Certified' || standard.status === 'Compliant' 
-                              ? 'bg-green-100 text-green-700' 
-                              : 'bg-blue-100 text-blue-700'
-                          }`}>
-                            {standard.status}
-                          </span>
+                          <p className="text-gray-700 mb-4">{vuln.description}</p>
+                          
+                          {expandedSection === `vuln-${index}` && (
+                            <div className="mt-4 pt-4 border-t border-gray-200">
+                              <div className="mb-4">
+                                <h5 className="font-medium text-gray-900 mb-2">Locations</h5>
+                                <div className="bg-gray-50 rounded-lg p-3 text-sm">
+                                  {vuln.locations ? (
+                                    <pre className="whitespace-pre-wrap text-gray-700 text-xs">
+                                      {JSON.stringify(vuln.locations, null, 2)}
+                                    </pre>
+                                  ) : (
+                                    <p className="text-gray-600">No specific locations identified</p>
+                                  )}
+                                </div>
+                              </div>
+                              <div>
+                                <h5 className="font-medium text-gray-900 mb-2">Recommendation</h5>
+                                <div className="bg-green-50 rounded-lg p-3 text-sm text-green-800">
+                                  {vuln.recommendation}
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                        <div className="text-sm text-gray-600">
-                          Valid until: {standard.validUntil}
-                        </div>
-                      </div>
+                      ))}
                     </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Compliance Details */}
-              <div className="bg-white border border-gray-200 rounded-xl p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Compliance Details</h3>
-                  <button
-                    onClick={() => toggleSectionExpansion('compliance')}
-                    className="text-gray-500 hover:text-gray-700"
-                  >
-                    {expandedSection === 'compliance' ? <Minimize size={16} /> : <Maximize size={16} />}
-                  </button>
-                </div>
-                <div className="space-y-4">
-                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                    <h4 className="font-medium text-green-900 mb-2">Data Protection</h4>
-                    <ul className="text-sm text-green-700 space-y-1">
-                      <li>• GDPR compliant data processing</li>
-                      <li>• Right to be forgotten implementation</li>
-                      <li>• Data portability features</li>
-                      <li>• Privacy by design architecture</li>
-                    </ul>
-                  </div>
-                  
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <h4 className="font-medium text-blue-900 mb-2">Security Controls</h4>
-                    <ul className="text-sm text-blue-700 space-y-1">
-                      <li>• SOC 2 Type II certified controls</li>
-                      <li>• Regular penetration testing</li>
-                      <li>• Vulnerability management program</li>
-                      <li>• Incident response procedures</li>
-                    </ul>
-                  </div>
-                  
-                  {expandedSection === 'compliance' && (
-                    <>
-                      <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                        <h4 className="font-medium text-purple-900 mb-2">Access Management</h4>
-                        <ul className="text-sm text-purple-700 space-y-1">
-                          <li>• Role-based access control (RBAC)</li>
-                          <li>• Multi-factor authentication</li>
-                          <li>• Least privilege principle</li>
-                          <li>• Regular access reviews</li>
-                        </ul>
-                      </div>
-                      
-                      <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                        <h4 className="font-medium text-yellow-900 mb-2">Business Continuity</h4>
-                        <ul className="text-sm text-yellow-700 space-y-1">
-                          <li>• Disaster recovery planning</li>
-                          <li>• Regular backup testing</li>
-                          <li>• High availability architecture</li>
-                          <li>• Geographic redundancy</li>
-                        </ul>
-                      </div>
-                    </>
                   )}
                 </div>
-              </div>
-              
-              {/* Compliance Certifications */}
-              <div className="bg-white border border-gray-200 rounded-xl p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Certifications & Attestations</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="p-4 bg-gray-50 rounded-lg text-center">
-                    <Shield size={24} className="text-blue-600 mx-auto mb-2" />
-                    <div className="font-medium text-gray-900">SOC 2 Type II</div>
-                    <div className="text-xs text-gray-600 mt-1">Certified</div>
+              )}
+
+              {activeTab === 'compliance' && (
+                <div className="space-y-6">
+                  {/* Compliance Overview */}
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-6">Compliance Status</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {Object.entries(scanResults.compliance).map(([standard, data]: [string, any]) => (
+                        <div key={standard} className="bg-gray-50 rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="font-medium text-gray-900">{standard}</h4>
+                            <span className={`flex items-center ${
+                              data.compliant ? 'text-green-600' : 'text-red-600'
+                            }`}>
+                              {data.compliant ? (
+                                <>
+                                  <CheckCircle size={16} className="mr-1" />
+                                  <span>Compliant</span>
+                                </>
+                              ) : (
+                                <>
+                                  <AlertTriangle size={16} className="mr-1" />
+                                  <span>Non-compliant</span>
+                                </>
+                              )}
+                            </span>
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            <div className="flex justify-between mb-1">
+                              <span>Issues:</span>
+                              <span className="font-medium">{data.issues}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Last checked:</span>
+                              <span>{new Date(data.lastChecked).toLocaleDateString()}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div className="p-4 bg-gray-50 rounded-lg text-center">
-                    <Globe size={24} className="text-green-600 mx-auto mb-2" />
-                    <div className="font-medium text-gray-900">GDPR</div>
-                    <div className="text-xs text-gray-600 mt-1">Compliant</div>
-                  </div>
-                  <div className="p-4 bg-gray-50 rounded-lg text-center">
-                    <Shield size={24} className="text-purple-600 mx-auto mb-2" />
-                    <div className="font-medium text-gray-900">ISO 27001</div>
-                    <div className="text-xs text-gray-600 mt-1">Certified</div>
-                  </div>
-                  <div className="p-4 bg-gray-50 rounded-lg text-center">
-                    <Shield size={24} className="text-red-600 mx-auto mb-2" />
-                    <div className="font-medium text-gray-900">HIPAA</div>
-                    <div className="text-xs text-gray-600 mt-1">Ready</div>
+
+                  {/* Compliance Details */}
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-lg font-semibold text-gray-900">Compliance Requirements</h3>
+                      <button
+                        onClick={() => toggleSectionExpansion('compliance')}
+                        className="text-gray-500 hover:text-gray-700"
+                      >
+                        {expandedSection === 'compliance' ? <Minimize size={18} /> : <Maximize size={18} />}
+                      </button>
+                    </div>
+                    <div className="space-y-6">
+                      <div className="bg-gray-50 rounded-lg p-4">
+                        <h4 className="font-medium text-gray-900 mb-3">SOC 2</h4>
+                        <p className="text-sm text-gray-600 mb-3">
+                          SOC 2 is a voluntary compliance standard for service organizations, developed by the American Institute of CPAs (AICPA), which specifies how organizations should manage customer data.
+                        </p>
+                        <div className="space-y-2">
+                          <div className="flex items-start">
+                            <CheckCircle size={16} className="text-green-600 mt-0.5 mr-2 flex-shrink-0" />
+                            <span className="text-sm text-gray-700">Data encryption at rest and in transit</span>
+                          </div>
+                          <div className="flex items-start">
+                            <CheckCircle size={16} className="text-green-600 mt-0.5 mr-2 flex-shrink-0" />
+                            <span className="text-sm text-gray-700">Access controls and user authentication</span>
+                          </div>
+                          <div className="flex items-start">
+                            <CheckCircle size={16} className="text-green-600 mt-0.5 mr-2 flex-shrink-0" />
+                            <span className="text-sm text-gray-700">Audit logging and monitoring</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {expandedSection === 'compliance' && (
+                        <>
+                          <div className="bg-gray-50 rounded-lg p-4">
+                            <h4 className="font-medium text-gray-900 mb-3">GDPR</h4>
+                            <p className="text-sm text-gray-600 mb-3">
+                              The General Data Protection Regulation (GDPR) is a regulation in EU law on data protection and privacy for all individuals within the European Union and the European Economic Area.
+                            </p>
+                            <div className="space-y-2">
+                              <div className="flex items-start">
+                                <CheckCircle size={16} className="text-green-600 mt-0.5 mr-2 flex-shrink-0" />
+                                <span className="text-sm text-gray-700">Data minimization and purpose limitation</span>
+                              </div>
+                              <div className="flex items-start">
+                                <CheckCircle size={16} className="text-green-600 mt-0.5 mr-2 flex-shrink-0" />
+                                <span className="text-sm text-gray-700">Right to access, rectification, and erasure</span>
+                              </div>
+                              <div className="flex items-start">
+                                <AlertTriangle size={16} className="text-red-600 mt-0.5 mr-2 flex-shrink-0" />
+                                <span className="text-sm text-gray-700">Data protection impact assessment</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="bg-gray-50 rounded-lg p-4">
+                            <h4 className="font-medium text-gray-900 mb-3">HIPAA</h4>
+                            <p className="text-sm text-gray-600 mb-3">
+                              The Health Insurance Portability and Accountability Act (HIPAA) sets the standard for protecting sensitive patient data in the United States.
+                            </p>
+                            <div className="space-y-2">
+                              <div className="flex items-start">
+                                <CheckCircle size={16} className="text-green-600 mt-0.5 mr-2 flex-shrink-0" />
+                                <span className="text-sm text-gray-700">Protected health information (PHI) safeguards</span>
+                              </div>
+                              <div className="flex items-start">
+                                <CheckCircle size={16} className="text-green-600 mt-0.5 mr-2 flex-shrink-0" />
+                                <span className="text-sm text-gray-700">Access controls and authentication</span>
+                              </div>
+                              <div className="flex items-start">
+                                <CheckCircle size={16} className="text-green-600 mt-0.5 mr-2 flex-shrink-0" />
+                                <span className="text-sm text-gray-700">Audit controls and integrity</span>
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    {!expandedSection && (
+                      <button
+                        onClick={() => setExpandedSection('compliance')}
+                        className="mt-4 text-sm text-red-600 hover:text-red-700 font-medium flex items-center"
+                      >
+                        View all compliance requirements
+                      </button>
+                    )}
                   </div>
                 </div>
-              </div>
-            </div>
+              )}
+
+              {activeTab === 'settings' && (
+                <div className="space-y-6">
+                  {/* Security Settings */}
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-6">Security Settings</h3>
+                    <div className="space-y-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-medium text-gray-900">End-to-End Encryption</h4>
+                          <p className="text-sm text-gray-600 mt-1">
+                            Encrypt all workflow data in transit and at rest
+                          </p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input type="checkbox" className="sr-only peer" defaultChecked />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-red-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
+                        </label>
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-medium text-gray-900">Audit Logging</h4>
+                          <p className="text-sm text-gray-600 mt-1">
+                            Track all workflow activities for security monitoring
+                          </p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input type="checkbox" className="sr-only peer" defaultChecked />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-red-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
+                        </label>
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-medium text-gray-900">Sensitive Data Detection</h4>
+                          <p className="text-sm text-gray-600 mt-1">
+                            Automatically detect and protect sensitive information
+                          </p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input type="checkbox" className="sr-only peer" defaultChecked />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-red-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
+                        </label>
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-medium text-gray-900">Security Notifications</h4>
+                          <p className="text-sm text-gray-600 mt-1">
+                            Receive alerts for security events and vulnerabilities
+                          </p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input type="checkbox" className="sr-only peer" defaultChecked />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-red-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Access Control */}
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-6">Access Control</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Security Level
+                        </label>
+                        <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent">
+                          <option value="basic">Basic</option>
+                          <option value="enhanced" selected>Enhanced</option>
+                          <option value="enterprise">Enterprise</option>
+                        </select>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          IP Whitelist
+                        </label>
+                        <div className="flex space-x-2">
+                          <input
+                            type="text"
+                            placeholder="Add IP address"
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                          />
+                          <button className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
+                            Add
+                          </button>
+                        </div>
+                        <div className="mt-2 text-xs text-gray-600">
+                          No IP addresses whitelisted
+                        </div>
+                      </div>
+                      
+                      <div className="pt-4 border-t border-gray-200">
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="font-medium text-gray-900">Team Access</h4>
+                          <button className="text-sm text-red-600 hover:text-red-700 font-medium">
+                            Manage
+                          </button>
+                        </div>
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                              <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center mr-3">
+                                <User size={16} className="text-purple-600" />
+                              </div>
+                              <div>
+                                <div className="text-sm font-medium text-gray-900">You (Owner)</div>
+                                <div className="text-xs text-gray-600">{user?.email}</div>
+                              </div>
+                            </div>
+                            <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium">
+                              Full Access
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </motion.div>
