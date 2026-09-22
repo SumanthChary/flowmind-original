@@ -1,4 +1,3 @@
-```markdown
 # FlowMind
 
 FlowMind is a modern, visual workflow automation platform designed to help users build, collaborate on, and execute automated processes using an intuitive canvas interface. Powered by React, Tailwind CSS, and Supabase, it provides real-time collaboration, state persistence, and seamless integrations.
